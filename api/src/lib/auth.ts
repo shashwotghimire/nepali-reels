@@ -2,6 +2,13 @@ import { betterAuth } from "better-auth";
 import { Pool } from "pg";
 
 export const auth = betterAuth({
+  advanced: {
+    cookiePrefix: "better-auth",
+    defaultCookieAttributes: {
+      sameSite: "none",
+      secure: true,
+    },
+  },
   database: new Pool({
     host: process.env.PGHOST,
     database: process.env.PGDATABASE,
