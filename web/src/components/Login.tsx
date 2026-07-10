@@ -11,6 +11,7 @@ function Login() {
         signIn.social({
           provider: "google",
           callbackURL: `${window.location.origin}/dashboard`,
+          redirect: true,
         });
       }}
     >
