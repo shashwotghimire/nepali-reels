@@ -19,6 +19,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.1",
     "better-auth": "^1.6.23",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -29,6 +30,7 @@
     "typescript": "^7.0.2"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/pg": "^8.20.0",
     "sequelize-cli": "^6.6.5"
   }
