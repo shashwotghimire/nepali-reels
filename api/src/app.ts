@@ -14,10 +14,10 @@ app.use(
       process.env.FRONTEND_ORIGIN_PROD!,
     ],
     credentials: true,
-  })
+  }),
 );
 app.use(express.json());
 
-app.all("/api/auth/*path", toNodeHandler(auth));
+app.all("/api/auth/*splat", toNodeHandler(auth));
 
 export default app;

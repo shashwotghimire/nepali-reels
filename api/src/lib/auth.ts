@@ -9,8 +9,9 @@ export const auth = betterAuth({
       secure: true,
     },
   },
-  oauthConfig: {
-    storeStateStrategy: "plain",
+  account: {
+    storeStateStrategy: "database",
+    skipStateCookieCheck: true,
   },
   database: new Pool({
     host: process.env.PGHOST,
