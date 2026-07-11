@@ -1,4 +1,3 @@
-import { signIn } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 
 function Login() {
@@ -8,11 +7,8 @@ function Login() {
       size="lg"
       className="w-full gap-3 px-4 py-5 text-sm font-medium"
       onClick={() => {
-        signIn.social({
-          provider: "google",
-          callbackURL: `${window.location.origin}/dashboard`,
-          redirect: true,
-        });
+        const callbackURL = encodeURIComponent(`${window.location.origin}/dashboard`);
+        window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/auth/signin/google?callbackURL=${callbackURL}`;
       }}
     >
       <svg viewBox="0 0 24 24" className="size-5 shrink-0" aria-hidden="true">
