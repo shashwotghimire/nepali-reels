@@ -11,16 +11,13 @@ export const auth = betterAuth({
   },
   account: {
     storeStateStrategy: "database",
-    skipStateCookieCheck: true,
   },
   database: new Pool({
     host: process.env.PGHOST,
     database: process.env.PGDATABASE,
     user: process.env.PGUSER,
     password: process.env.PGPASSWORD,
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    ssl: true,
   }),
   baseURL: process.env.BETTER_AUTH_URL!,
   trustedOrigins: [process.env.FRONTEND_ORIGIN_LOCAL!, process.env.FRONTEND_ORIGIN_PROD!].filter(Boolean),
