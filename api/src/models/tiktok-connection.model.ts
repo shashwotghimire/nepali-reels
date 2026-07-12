@@ -19,6 +19,10 @@ class TiktokConnection extends Model<
   declare tiktokAccessToken: string;
   declare tiktokRefreshToken: string;
   declare tiktokExpiresAt: number;
+  declare tiktokRefreshExpiresAt: number;
+  declare displayName: CreationOptional<string | null>;
+  declare avatarUrl: CreationOptional<string | null>;
+  declare username: CreationOptional<string | null>;
 }
 
 TiktokConnection.init(
@@ -31,6 +35,7 @@ TiktokConnection.init(
     userId: {
       type: DataTypes.STRING,
       allowNull: false,
+      unique: true,
       references: { model: User, key: "id" },
     },
     tiktokUserId: {
@@ -46,8 +51,24 @@ TiktokConnection.init(
       allowNull: false,
     },
     tiktokExpiresAt: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.BIGINT,
       allowNull: false,
+    },
+    tiktokRefreshExpiresAt: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+    },
+    displayName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    avatarUrl: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    username: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {

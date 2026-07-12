@@ -1,8 +1,8 @@
 import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import AppSidebar from "@/components/AppSidebar";
-import UserProfile from "@/components/UserProfile";
+import AppSidebar from "@/components/common/AppSidebar";
+import UserProfile from "@/components/common/UserProfile";
 
 function AppLayout() {
   return (

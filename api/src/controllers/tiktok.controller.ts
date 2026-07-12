@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import asyncHandler from "../utils/asyncHandler.util";
-import { buildAuthUrl, exchangeCodeForToken } from "../services/tiktok.service";
+import {
+  buildAuthUrl,
+  exchangeCodeForToken,
+  getUserTiktokConnectionDetailsService,
+  disconnectTiktokService,
+} from "../services/tiktok.service";
 import { ApiResponse } from "../utils/ApiResponse.util";
 import { ApiError } from "../utils/ApiError.util";
 import { STATE_COOKIE } from "../constants/constant";
@@ -15,8 +20,8 @@ export const connectTiktok = asyncHandler(
       maxAge: 10 * 60 * 1000,
       signed: true,
     });
-    // res.redirect(url)
-    res.status(200).json(new ApiResponse(true, "Connection initiated!", url));
+    res.redirect(url);
+    // res.status(200).json(new ApiResponse(true, "Connection initiated!", url));
   },
 );
 
@@ -39,7 +44,34 @@ export const tiktokCallback = asyncHandler(
         "INVALID_STATE",
       );
     }
-    const tokenData = await exchangeCodeForToken(code as string);
-    res.status(200).json(new ApiResponse(true, "Tiktok connected!", tokenData));
+    await exchangeCodeForToken(code as string, res.locals.user.id);
+    res.redirect(`${process.env.FRONTEND_ORIGIN_PROD}/connections`);
+    // res.redirect(`${process.env.FRONTEND_ORIGIN_LOCAL}/connections`);
+  },
+);
+
+export const getTiktokStatus = asyncHandler(
+  async (req: Request, res: Response) => {
+    const connection = await getUserTiktokConnectionDetailsService(res.locals.user.id);
+    res.status(200).json(
+      new ApiResponse(true, "TikTok connection status fetched.", {
+        connected: !!connection,
+        tiktokUserId: connection?.tiktokUserId ?? null,
+        profile: connection
+          ? {
+              display_name: connection.displayName,
+              avatar_url: connection.avatarUrl,
+              username: connection.username,
+            }
+          : null,
+      }),
+    );
+  },
+);
+
+export const disconnectTiktok = asyncHandler(
+  async (req: Request, res: Response) => {
+    await disconnectTiktokService(res.locals.user.id);
+    res.status(200).json(new ApiResponse(true, "TikTok account disconnected."));
   },
 );

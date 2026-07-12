@@ -1,5 +1,4 @@
-import PlatformGrid from "@/components/connections/PlatformGrid";
-import ConnectionHealthLog from "@/components/connections/ConnectionHealthLog";
+import TikTokConnectionCard from "@/components/connections/TikTokConnectionCard";
 
 export default function Connections() {
   return (
@@ -8,8 +7,9 @@ export default function Connections() {
         <h1 className="text-2xl font-semibold mb-1">Connections</h1>
         <p className="text-muted-foreground text-sm">Link your social media accounts to manage publishing pipelines.</p>
       </div>
-      <PlatformGrid />
-      <ConnectionHealthLog />
+      <div className="flex flex-wrap gap-4">
+        <TikTokConnectionCard />
+      </div>
     </div>
   );
 }

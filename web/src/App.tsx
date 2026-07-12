@@ -6,9 +6,9 @@ import Connections from "./pages/Connections";
 import Settings from "./pages/Settings";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
-import ProtectedRoute from "./components/ProtectedRoute";
-import PublicRoute from "./components/PublicRoute";
-import AppLayout from "./components/AppLayout";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PublicRoute from "./components/auth/PublicRoute";
+import AppLayout from "./components/common/AppLayout";
 
 function App() {
   return (

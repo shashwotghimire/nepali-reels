@@ -10,4 +10,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    host: true,
+    allowedHosts: ["app.shashwotghimire.tech"],
+    hmr: {
+      host: "app.shashwotghimire.tech",
+      protocol: "wss",
+    },
+  },
 });

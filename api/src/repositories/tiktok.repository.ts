@@ -6,6 +6,31 @@ export const createTiktokConnection = async (data: {
   tiktokAccessToken: string;
   tiktokRefreshToken: string;
   tiktokExpiresAt: number;
+  tiktokRefreshExpiresAt: number;
+  displayName?: string;
+  avatarUrl?: string;
+  username?: string;
 }) => {
-  return TiktokConnection.create(data);
+  return TiktokConnection.upsert(data, { conflictFields: ["userId"] });
+};
+
+export const getUserTiktokConnectionDetails = async (data: {
+  userId: string;
+}) => {
+  return TiktokConnection.findOne({
+    where: {
+      userId: data.userId,
+    },
+  });
+};
+
+export const deleteTiktokConnection = async (userId: string) => {
+  return TiktokConnection.destroy({ where: { userId } });
+};
+
+export const getUserTiktokAccessToken = async (userId: string) => {
+  return TiktokConnection.findOne({
+    where: { userId },
+    attributes: ["tiktokAccessToken"],
+  });
 };
