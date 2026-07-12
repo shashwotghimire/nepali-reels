@@ -72,6 +72,6 @@ export const getTiktokStatus = asyncHandler(
 export const disconnectTiktok = asyncHandler(
   async (req: Request, res: Response) => {
     await disconnectTiktokService(res.locals.user.id);
-    res.status(200).json(new ApiResponse(true, "TikTok account disconnected."));
+    res.status(200).json(new ApiResponse(true, "TikTok account disconnected.", "TikTok account disconnected."));
   },
 );
