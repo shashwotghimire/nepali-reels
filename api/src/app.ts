@@ -6,6 +6,7 @@ import { toNodeHandler } from "better-auth/node";
 import { errorHandler } from "./middlewares/error.middleware";
 import tiktokRouter from "./routes/tiktok.route";
 import userRoute from "./routes/user.route";
+import pipelineRouter from "./routes/pipeline.route";
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use(express.json());
 app.all("/api/auth/*splat", toNodeHandler(auth));
 app.use("/api/users", userRoute);
 app.use("/api/tiktok", tiktokRouter);
+app.use("/api/pipeline", pipelineRouter);
 
 app.use(errorHandler);
 export default app;
