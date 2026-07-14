@@ -43,3 +43,5 @@ export const ScriptOutputSchema = z.object({
   platformDescription: z.string(),
   estDurationSec: z.number().min(40).max(75),
 });
+
+export type ScriptOutput = z.infer<typeof ScriptOutputSchema>;
