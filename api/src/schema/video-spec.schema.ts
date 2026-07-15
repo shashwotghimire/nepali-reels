@@ -15,5 +15,5 @@ export const VideoSpecSchema = z.object({
   thumbnailText: z.string(),
 });
 
-export type VideoSpec = z.infer<typeof VideoSpecSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
+export type VideoSpec = z.infer<typeof VideoSpecSchema>;
