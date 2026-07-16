@@ -1,4 +1,4 @@
-type PipelineStatus =
+export type PipelineStatus =
   | "queued"
   | "script_generated"
   | "script_finalised"

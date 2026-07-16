@@ -15,3 +15,7 @@ export async function runTavilySearch(query: string) {
     score: result.score,
   }));
 }
+
+export async function runTavilyResearch(query: string) {
+  const response = await tavilyClient.research(query, {});
+}

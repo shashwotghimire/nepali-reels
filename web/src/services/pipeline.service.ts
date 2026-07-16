@@ -15,8 +15,10 @@ export const getReelsService = async (params?: GetReelsParams) => {
 };
 
 export const getPipelineByIdService = async (id: string) => {
-  const res = (
-    await axiosInstance.get<{ data: Reel }>(`/api/pipeline/${id}`)
-  ).data;
+  const res = (await axiosInstance.get<{ data: Reel }>(`/api/pipeline/${id}`))
+    .data;
   return res.data;
 };
+
+export const getPipelineAudioUrl = (id: string) =>
+  `${import.meta.env.VITE_API_BASE_URL}/api/pipeline/${id}/audio`;

@@ -2,30 +2,26 @@ import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import client from "../../../configs/llm.config";
 import { ScriptOutput } from "../../../schema/script-writer.schema";
 import { FACT_CHECK_RUNS } from "../../../constants/constant";
-import { readFileSync } from "node:fs";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import path from "node:path";
 import { tavliySearchTool } from "../../../tools/tavily-search.tool";
 import { FactCheckOutputSchema } from "../../../schema/fact-checker.schema";
 import { runTavilySearch } from "../../../configs/tavily.config";
-
-const systemPrompt = readFileSync(
-  path.join(__dirname, "../../../llm/fact-checker.prompt.md"),
-  "utf-8",
-);
+import { factCheckerPrompt } from "../../../llm/fact-checker.prompt";
 
 export const factCheckerAgent = async (script: ScriptOutput) => {
+  const today = new Date().toISOString().split("T")[0] ?? "";
   const messages: MessageParam[] = [
     {
       role: "user",
-      content: `Review this script. \n${JSON.stringify(script)}`,
+      content: `Review this script.\n${JSON.stringify(script)}`,
     },
   ];
+
   for (let i = 0; i < FACT_CHECK_RUNS; i++) {
     const response = await client.messages.parse({
       model: `${process.env.AWS_SONNET_MODEL}`,
       max_tokens: 4096,
-      system: systemPrompt,
+      system: factCheckerPrompt(today),
       tools: [tavliySearchTool],
       output_config: {
         format: zodOutputFormat(FactCheckOutputSchema),

@@ -1,4 +1,6 @@
+import { useNavigate } from "react-router-dom";
 import { useGetReelsOfUser } from "@/hooks/api/usePipeline";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -9,20 +11,10 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-
-const STATUS_VARIANT: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  queued: "outline",
-  script_generated: "secondary",
-  script_finalised: "secondary",
-  video_spec_generated: "default",
-  sound_generated: "default",
-  failed: "destructive",
-};
+import { PIPELINE_STATUS_VARIANT } from "@/types/ui/pipeline.types";
 
 export default function UserReelsTable() {
+  const navigate = useNavigate();
   const { data, isPending, error } = useGetReelsOfUser();
 
   if (isPending) {
@@ -57,6 +49,7 @@ export default function UserReelsTable() {
             <TableHead>Topic</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -64,14 +57,21 @@ export default function UserReelsTable() {
             <TableRow key={reel.id}>
               <TableCell className="font-medium">{reel.topic}</TableCell>
               <TableCell>
-                <Badge
-                  variant={STATUS_VARIANT[reel.pipelineStatus] ?? "outline"}
-                >
+                <Badge variant={PIPELINE_STATUS_VARIANT[reel.pipelineStatus]}>
                   {reel.pipelineStatus.replace(/_/g, " ")}
                 </Badge>
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(reel.createdAt).toLocaleDateString()}
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/dashboard/pipeline/${reel.id}`)}
+                >
+                  View
+                </Button>
               </TableCell>
             </TableRow>
           ))}
