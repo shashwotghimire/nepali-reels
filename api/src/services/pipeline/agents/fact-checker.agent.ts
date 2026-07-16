@@ -19,7 +19,7 @@ export const factCheckerAgent = async (script: ScriptOutput) => {
 
   for (let i = 0; i < FACT_CHECK_RUNS; i++) {
     const response = await client.messages.parse({
-      model: `${process.env.AWS_SONNET_MODEL}`,
+      model: `${process.env.AWS_OPUS_45_MODEL}`,
       max_tokens: 4096,
       system: factCheckerPrompt(today),
       tools: [tavliySearchTool],
