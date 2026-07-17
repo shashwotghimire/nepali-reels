@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "worker": "tsx watch src/worker.ts",
     "build": "tsc",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
@@ -22,10 +23,13 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.1",
     "better-auth": "^1.6.23",
+    "bullmq": "^5.80.6",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "ioredis": "^5.11.1",
+    "nodemailer": "^9.0.3",
     "pg": "^8.22.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.8",
@@ -35,6 +39,7 @@
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.20.0",
     "@types/wav": "^1.0.4",
     "sequelize-cli": "^6.6.5"

@@ -8,7 +8,7 @@ import { FactCheckOutputSchema } from "../../../schema/fact-checker.schema";
 import { runTavilySearch } from "../../../configs/tavily.config";
 import { factCheckerPrompt } from "../../../llm/fact-checker.prompt";
 
-export const factCheckerAgent = async (script: ScriptOutput) => {
+export const factCheckerAgent = async (script: ScriptOutput, model: string) => {
   const today = new Date().toISOString().split("T")[0] ?? "";
   const messages: MessageParam[] = [
     {
@@ -19,7 +19,7 @@ export const factCheckerAgent = async (script: ScriptOutput) => {
 
   for (let i = 0; i < FACT_CHECK_RUNS; i++) {
     const response = await client.messages.parse({
-      model: `${process.env.AWS_OPUS_45_MODEL}`,
+      model,
       max_tokens: 4096,
       system: factCheckerPrompt(today),
       tools: [tavliySearchTool],

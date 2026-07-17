@@ -48,6 +48,7 @@ export default function UserReelsTable() {
           <TableRow>
             <TableHead>Topic</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Model</TableHead>
             <TableHead>Created</TableHead>
             <TableHead />
           </TableRow>
@@ -60,6 +61,9 @@ export default function UserReelsTable() {
                 <Badge variant={PIPELINE_STATUS_VARIANT[reel.pipelineStatus]}>
                   {reel.pipelineStatus.replace(/_/g, " ")}
                 </Badge>
+              </TableCell>
+              <TableCell className="text-muted-foreground text-xs">
+                {reel.claudeModel.split("claude-")[1]?.split("-v")[0] ?? reel.claudeModel}
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(reel.createdAt).toLocaleDateString()}

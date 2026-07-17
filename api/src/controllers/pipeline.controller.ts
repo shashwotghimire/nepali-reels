@@ -3,7 +3,8 @@ import fs from "fs";
 import { Request, Response } from "express";
 import asyncHandler from "../utils/asyncHandler.util";
 import { ApiResponse } from "../utils/ApiResponse.util";
-import { createPipelineService } from "../services/pipeline/pipeline.service";
+import { pipelineQueue } from "../queue/pipeline.queue";
+import { initPipelineService } from "../services/pipeline/pipeline.service";
 import {
   getReelsService,
   getPipelineByIdService,
@@ -61,7 +62,7 @@ export const getPipelineAudio = asyncHandler(
 
     if (range) {
       const [startStr, endStr] = range.replace(/bytes=/, "").split("-");
-      const start = parseInt(startStr, 10);
+      const start = parseInt(startStr ?? "0", 10);
       const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
       res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
       res.setHeader("Content-Length", end - start + 1);
@@ -77,11 +78,12 @@ export const getPipelineAudio = asyncHandler(
 
 export const generateScript = asyncHandler(
   async (req: Request, res: Response) => {
-    const { topic } = req.body;
+    const { topic, model } = req.body;
     const userId = res.locals.user.id;
-    const result = await createPipelineService(userId, topic);
+    const pipeline = await initPipelineService(userId, topic, model);
+    await pipelineQueue.add("generate", { userId, pipelineId: pipeline.id, topic, model });
     res
-      .status(200)
-      .json(new ApiResponse(true, "Script generated successfully", result));
+      .status(202)
+      .json(new ApiResponse(true, "Pipeline queued successfully", { pipelineId: pipeline.id, model }));
   },
 );

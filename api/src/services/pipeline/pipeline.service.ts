@@ -12,11 +12,23 @@ import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
 import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
 
-export const createPipelineService = async (userId: string, topic: string) => {
-  const pipeline = await createPipeline(userId, topic);
-  const draftScript = await scriptGeneratorAgent(topic);
-  await saveDraftScript(pipeline.id, userId, draftScript);
-  const factCheck = await factCheckerAgent(draftScript);
+export const initPipelineService = async (userId: string, topic: string, model: string) => {
+  return await createPipeline(userId, topic, model);
+};
+
+export const createPipelineService = async (userId: string, pipelineId: string, topic: string, model: string) => {
+  console.log(`[pipeline:${pipelineId}] starting pipeline for topic: "${topic}" with model: ${model}`);
+
+  console.log(`[pipeline:${pipelineId}] generating draft script...`);
+  const draftScript = await scriptGeneratorAgent(topic, model);
+  await saveDraftScript(pipelineId, userId, draftScript);
+  console.log(`draft script: \n${JSON.stringify(draftScript)}`);
+  console.log(`[pipeline:${pipelineId}] draft script saved`);
+
+  console.log(`[pipeline:${pipelineId}] running fact check...`);
+  const factCheck = await factCheckerAgent(draftScript, model);
+  console.log(`final script: \n${JSON.stringify(factCheck)}`);
+  console.log(`[pipeline:${pipelineId}] fact check verdict: ${factCheck?.verdict}`);
 
   let finalScript;
   if (factCheck?.verdict === "pass") {
@@ -38,10 +50,18 @@ export const createPipelineService = async (userId: string, topic: string) => {
   } else {
     throw new ApiError(500, "Unexpected fact-check verdict", "Internal error");
   }
-  await saveFinalScript(pipeline.id, userId, finalScript);
-  const videoSpec = await videoSpecGeneratorAgent(finalScript);
-  await saveVideoSpec(pipeline.id, userId, videoSpec);
-  const soundSpec = await generateTextToSpeechAgent(videoSpec, pipeline.id);
-  await saveAudioSpec(pipeline.id, userId, soundSpec);
-  return await findPipelineById(pipeline.id, userId);
+  await saveFinalScript(pipelineId, userId, finalScript);
+  console.log(`[pipeline:${pipelineId}] final script saved`);
+
+  console.log(`[pipeline:${pipelineId}] generating video spec...`);
+  const videoSpec = await videoSpecGeneratorAgent(finalScript, model);
+  await saveVideoSpec(pipelineId, userId, videoSpec);
+  console.log(`[pipeline:${pipelineId}] video spec saved`);
+
+  console.log(`[pipeline:${pipelineId}] generating audio...`);
+  const soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
+  await saveAudioSpec(pipelineId, userId, soundSpec);
+  console.log(`[pipeline:${pipelineId}] audio saved — pipeline complete`);
+
+  return await findPipelineById(pipelineId, userId);
 };

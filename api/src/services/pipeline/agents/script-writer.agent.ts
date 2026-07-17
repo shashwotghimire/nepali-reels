@@ -7,14 +7,14 @@ import { runTavilySearch } from "../../../configs/tavily.config";
 import { FACT_CHECK_RUNS } from "../../../constants/constant";
 import { scriptWriterPrompt } from "../../../llm/script-writer.prompt";
 
-export const scriptGeneratorAgent = async (topic: string) => {
+export const scriptGeneratorAgent = async (topic: string, model: string) => {
   const today = new Date().toISOString().split("T")[0] ?? "";
   const messages: MessageParam[] = [{ role: "user", content: topic }];
 
   try {
     for (let i = 0; i < FACT_CHECK_RUNS; i++) {
       const response = await client.messages.parse({
-        model: `${process.env.AWS_OPUS_45_MODEL}`,
+        model,
         max_tokens: 4096,
         system: scriptWriterPrompt(today),
         tools: [tavliySearchTool],

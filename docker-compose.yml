@@ -1,16 +1,44 @@
 services:
-  api:
-    build:
-      context: ./api
-    ports:
-      - "8000:8000"
+  # api:
+  #   build:
+  #     context: ./api
+  #   ports:
+  #     - "8000:8000"
+  #   env_file:
+  #     - ./api/.env
+  #   restart: unless-stopped
+
+  # web:
+  #   build:
+  #     context: ./web
+  #   ports:
+  #     - "5173:80"
+  #   restart: unless-stopped
+
+  redis:
+    image: redis:8.8-alpine
+    container_name: redis
+    restart: unless-stopped
     env_file:
       - ./api/.env
-    restart: unless-stopped
-
-  web:
-    build:
-      context: ./web
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
+    command: sh -c 'redis-server --requirepass "$$REDIS_PASSWORD"'
     ports:
-      - "5173:80"
-    restart: unless-stopped
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  redis_data:

@@ -3,10 +3,11 @@ import Reels from "../models/reels.model";
 import { ScriptOutput } from "../schema/script-writer.schema";
 import { VideoSpec } from "../schema/video-spec.schema";
 
-export const createPipeline = (userId: string, topic: string) => {
+export const createPipeline = (userId: string, topic: string, claudeModel: string) => {
   return Reels.create({
     userId,
     topic,
+    claudeModel,
     pipelineStatus: "queued",
   });
 };

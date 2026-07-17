@@ -1,6 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { getReelsService, getPipelineByIdService } from "@/services/pipeline.service";
-import type { GetReelsParams } from "@/types/api/pipeline-api.types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  generateScriptService,
+  getReelsService,
+  getPipelineByIdService,
+} from "@/services/pipeline.service";
+import type {
+  GenerateScriptRequest,
+  GetReelsParams,
+} from "@/types/api/pipeline-api.types";
 
 export const useGetReelsOfUser = (params?: GetReelsParams) =>
   useQuery({
@@ -14,3 +21,13 @@ export const useGetPipelineById = (id: string) =>
     queryFn: () => getPipelineByIdService(id),
     enabled: !!id,
   });
+
+export const useGenerateScript = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GenerateScriptRequest) => generateScriptService(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pipeline", "reels"] });
+    },
+  });
+};

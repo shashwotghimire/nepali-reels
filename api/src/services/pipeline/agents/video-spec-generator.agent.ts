@@ -4,10 +4,10 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ScriptOutput } from "../../../schema/script-writer.schema";
 import { videoSpecPrompt } from "../../../llm/video-spec.prompt";
 
-export const videoSpecGeneratorAgent = async (script: ScriptOutput) => {
+export const videoSpecGeneratorAgent = async (script: ScriptOutput, model: string) => {
   const today = new Date().toISOString().split("T")[0] ?? "";
   const response = await client.messages.parse({
-    model: `${process.env.AWS_SONNET_MODEL}`,
+    model,
     max_tokens: 8192,
     system: videoSpecPrompt(today),
     output_config: {

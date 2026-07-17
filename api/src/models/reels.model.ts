@@ -24,6 +24,7 @@ export class Reels extends Model<
   declare id: CreationOptional<string>;
   declare userId: ForeignKey<string>;
   declare topic: string;
+  declare claudeModel: string;
   declare draftScript: CreationOptional<object | null>;
   declare finalScript: CreationOptional<object | null>;
   declare videoSpec: CreationOptional<object | null>;
@@ -48,6 +49,10 @@ Reels.init(
       onDelete: "CASCADE",
     },
     topic: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    claudeModel: {
       type: DataTypes.STRING,
       allowNull: false,
     },
