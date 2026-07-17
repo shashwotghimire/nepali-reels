@@ -15,6 +15,7 @@ type PipelineStatus =
   | "script_finalised"
   | "video_spec_generated"
   | "sound_generated"
+  | "video_generated"
   | "failed";
 
 export class Reels extends Model<
@@ -79,6 +80,7 @@ Reels.init(
         "script_finalised",
         "video_spec_generated",
         "sound_generated",
+        "video_generated",
         "failed",
       ),
       allowNull: false,

@@ -88,6 +88,20 @@ export const saveAudioSpec = async (
   await pipeline.save();
 };
 
+export const saveVideoOutput = async (pipelineId: string, userId: string, videoFilePath: string) => {
+  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
+  if (!pipeline) throw new Error("Reel not found");
+  pipeline.pipelineStatus = "video_generated";
+  await pipeline.save();
+};
+
+export const markPipelineAsFailed = async (pipelineId: string) => {
+  const pipeline = await Reels.findOne({ where: { id: pipelineId } });
+  if (!pipeline) throw new Error("Reel not found");
+  pipeline.pipelineStatus = "failed";
+  await pipeline.save();
+};
+
 export const findPipelineById = (pipelineId: string, userId: string) => {
   return Reels.findOne({
     where: {

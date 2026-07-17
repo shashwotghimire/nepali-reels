@@ -4,6 +4,7 @@ export type PipelineStatus =
   | "script_finalised"
   | "video_spec_generated"
   | "sound_generated"
+  | "video_generated"
   | "failed";
 
 interface HookOption {

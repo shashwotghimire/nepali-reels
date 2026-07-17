@@ -8,7 +8,7 @@ export const generateTextToSpeechAgent = async (
 ) => {
   const response = await gClient.interactions.create({
     model: "gemini-3.1-flash-tts-preview",
-    input: `${videoSpec.voiceoverText}`,
+    input: `${videoSpec.voiceoverText} and ensure the length of the audio is ${videoSpec.scenes}`,
     response_format: { type: "audio" },
     generation_config: {
       speech_config: [{ voice: "Aoede" }],

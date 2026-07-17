@@ -4,7 +4,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PIPELINE_STATUS_VARIANT } from "@/types/ui/pipeline.types";
-import { getPipelineAudioUrl } from "@/services/pipeline.service";
+import {
+  getPipelineAudioUrl,
+  getPipelineVideoUrl,
+} from "@/services/pipeline.service";
 import type { ScriptOutput, VideoSpec } from "@/types/api/pipeline-api.types";
 
 function ScriptSection({
@@ -49,7 +52,9 @@ function ScriptSection({
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
             Description
           </p>
-          <p className="text-sm leading-relaxed">{script.platformDescription}</p>
+          <p className="text-sm leading-relaxed">
+            {script.platformDescription}
+          </p>
         </div>
 
         <div className="p-4 space-y-2">
@@ -58,10 +63,7 @@ function ScriptSection({
           </p>
           <div className="space-y-2">
             {script.shotPlan.map((shot) => (
-              <div
-                key={shot.index}
-                className="flex gap-3 text-sm"
-              >
+              <div key={shot.index} className="flex gap-3 text-sm">
                 <span className="text-muted-foreground w-5 shrink-0">
                   {shot.index}.
                 </span>
@@ -116,7 +118,11 @@ function ScriptSection({
           </p>
           <div className="flex flex-wrap gap-1.5">
             {script.hashtags.map((tag, i) => (
-              <Badge key={i} variant="secondary" className="text-xs font-normal">
+              <Badge
+                key={i}
+                variant="secondary"
+                className="text-xs font-normal"
+              >
                 {tag}
               </Badge>
             ))}
@@ -236,7 +242,8 @@ export default function PipelineDetail() {
         </div>
 
         <div className="space-y-6 sticky top-6">
-          {data.pipelineStatus === "sound_generated" && (
+          {(data.pipelineStatus === "sound_generated" ||
+            data.pipelineStatus === "video_generated") && (
             <section className="space-y-2">
               <h2 className="text-base font-semibold">Audio</h2>
               <audio
@@ -247,12 +254,17 @@ export default function PipelineDetail() {
               />
             </section>
           )}
-          <section className="space-y-2">
-            <h2 className="text-base font-semibold">Video</h2>
-            <div className="rounded-lg border bg-muted aspect-video flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">Not yet generated</p>
-            </div>
-          </section>
+          {data.pipelineStatus === "video_generated" && (
+            <section className="space-y-2">
+              <h2 className="text-base font-semibold">Video</h2>
+              <video
+                controls
+                src={getPipelineVideoUrl(data.id)}
+                crossOrigin="use-credentials"
+                className="w-full max-w-xs rounded-lg aspect-9/16 bg-black"
+              />
+            </section>
+          )}
         </div>
       </div>
     </div>

@@ -29,8 +29,11 @@ export const generateScriptService = async (body: GenerateScriptRequest) => {
   const res = (
     await axiosInstance.post<{ data: GenerateScriptResponse }>(
       "/api/pipeline/generate-script",
-      body
+      body,
     )
   ).data;
   return res.data;
 };
+
+export const getPipelineVideoUrl = (id: string) =>
+  `${import.meta.env.VITE_API_BASE_URL}/api/pipeline/${id}/video`;

@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { createPipelineService } from "../services/pipeline/pipeline.service";
+import { createPipelineService, markPipelineAsFailedService } from "../services/pipeline/pipeline.service";
 import { connection } from "../configs/redis.config";
 
 export const pipelineWorker = new Worker(
@@ -14,4 +14,9 @@ export const pipelineWorker = new Worker(
 );
 
 pipelineWorker.on("completed", (job) => console.log(`[worker] job ${job.id} completed`));
-pipelineWorker.on("failed", (job, err) => console.error(`[worker] job ${job?.id} failed:`, err));
+pipelineWorker.on("failed", async (job, err) => {
+  console.error(`[worker] job ${job?.id} failed:`, err);
+  if (job?.data?.pipelineId) {
+    await markPipelineAsFailedService(job.data.pipelineId);
+  }
+});

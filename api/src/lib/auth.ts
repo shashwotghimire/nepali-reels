@@ -1,5 +1,7 @@
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
+import { emailQueue } from "../queue/email.queue";
+import { welcomeEmailTemplate } from "../utils/email-templates.util";
 
 export const auth = betterAuth({
   advanced: {
@@ -21,6 +23,16 @@ export const auth = betterAuth({
   }),
   baseURL: process.env.BETTER_AUTH_URL!,
   trustedOrigins: [process.env.FRONTEND_ORIGIN_LOCAL!, process.env.FRONTEND_ORIGIN_PROD!].filter(Boolean),
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          const { subject, html } = welcomeEmailTemplate(user.name);
+          await emailQueue.add("welcome", { to: user.email, subject, html });
+        },
+      },
+    },
+  },
   socialProviders: {
     google: {
       prompt: "select_account",

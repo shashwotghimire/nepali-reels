@@ -1,9 +1,11 @@
 import {
   createPipeline,
   findPipelineById,
+  markPipelineAsFailed,
   saveAudioSpec,
   saveDraftScript,
   saveFinalScript,
+  saveVideoOutput,
   saveVideoSpec,
 } from "../../repositories/reels.repository";
 import { ApiError } from "../../utils/ApiError.util";
@@ -11,6 +13,7 @@ import { factCheckerAgent } from "../pipeline/agents/fact-checker.agent";
 import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
 import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
+import { compositeVideo } from "../../helpers/video.helper";
 
 export const initPipelineService = async (userId: string, topic: string, model: string) => {
   return await createPipeline(userId, topic, model);
@@ -61,7 +64,16 @@ export const createPipelineService = async (userId: string, pipelineId: string, 
   console.log(`[pipeline:${pipelineId}] generating audio...`);
   const soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
   await saveAudioSpec(pipelineId, userId, soundSpec);
-  console.log(`[pipeline:${pipelineId}] audio saved — pipeline complete`);
+  console.log(`[pipeline:${pipelineId}] audio saved`);
+
+  console.log(`[pipeline:${pipelineId}] compositing video...`);
+  const videoFilePath = await compositeVideo(pipelineId, videoSpec.scenes);
+  await saveVideoOutput(pipelineId, userId, videoFilePath);
+  console.log(`[pipeline:${pipelineId}] video composited — pipeline complete`);
 
   return await findPipelineById(pipelineId, userId);
+};
+
+export const markPipelineAsFailedService = async (pipelineId: string) => {
+  await markPipelineAsFailed(pipelineId);
 };
