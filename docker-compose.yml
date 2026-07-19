@@ -1,19 +1,19 @@
 services:
-  # api:
-  #   build:
-  #     context: ./api
-  #   ports:
-  #     - "8000:8000"
-  #   env_file:
-  #     - ./api/.env
-  #   restart: unless-stopped
+  api:
+    build:
+      context: ./api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./api/.env
+    restart: unless-stopped
 
-  # web:
-  #   build:
-  #     context: ./web
-  #   ports:
-  #     - "5173:80"
-  #   restart: unless-stopped
+  web:
+    build:
+      context: ./web
+    ports:
+      - "5173:80"
+    restart: unless-stopped
 
   redis:
     image: redis:8.8-alpine
