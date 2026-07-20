@@ -11,7 +11,10 @@ export const buildAuthUrl = () => {
   const state = generateToken();
   const url = new URL("https://www.tiktok.com/v2/auth/authorize/");
   url.searchParams.set("client_key", process.env.TIKTOK_CLIENT_KEY!);
-  url.searchParams.set("scope", "user.info.basic,user.info.profile,user.info.stats");
+  url.searchParams.set(
+    "scope",
+    "user.info.basic,user.info.profile,user.info.stats",
+  );
   url.searchParams.set("response_type", "code");
   url.searchParams.set("redirect_uri", process.env.TIKTOK_REDIRECT_URI!);
   url.searchParams.set("state", state);
@@ -25,7 +28,11 @@ const fetchTiktokProfile = async (accessToken: string) => {
   );
   const data = await res.json();
   if (data.error?.code !== "ok")
-    throw new ApiError(400, `TikTok API error: ${data.error?.message}`, "TIKTOK_API_ERROR");
+    throw new ApiError(
+      400,
+      `TikTok API error: ${data.error?.message}`,
+      "TIKTOK_API_ERROR",
+    );
   return data.data.user;
 };
 
@@ -46,7 +53,11 @@ export const exchangeCodeForToken = async (code: string, userId: string) => {
   });
   const data = await res.json();
   if (data.error)
-    throw new ApiError(400, `TikTok OAuth error: ${data.error}`, "TIKTOK_OAUTH_ERROR");
+    throw new ApiError(
+      400,
+      `TikTok OAuth error: ${data.error}`,
+      "TIKTOK_OAUTH_ERROR",
+    );
 
   const profile = await fetchTiktokProfile(data.access_token);
   const now = Date.now();
@@ -77,6 +88,12 @@ export const disconnectTiktokService = async (userId: string) => {
 export const getUserTiktokProfileService = async (userId: string) => {
   const connection = await getUserTiktokAccessToken(userId);
   if (!connection)
-    throw new ApiError(404, "TikTok account not connected", "TIKTOK_NOT_CONNECTED");
+    throw new ApiError(
+      404,
+      "TikTok account not connected",
+      "TIKTOK_NOT_CONNECTED",
+    );
   return fetchTiktokProfile(connection.tiktokAccessToken);
 };
+
+export const uploadToTiktokService = async () => {};
