@@ -13,7 +13,7 @@ export const buildAuthUrl = () => {
   url.searchParams.set("client_key", process.env.TIKTOK_CLIENT_KEY!);
   url.searchParams.set(
     "scope",
-    "user.info.basic,user.info.profile,user.info.stats",
+    "user.info.basic,user.info.profile,user.info.stats,video.publish",
   );
   url.searchParams.set("response_type", "code");
   url.searchParams.set("redirect_uri", process.env.TIKTOK_REDIRECT_URI!);
@@ -96,4 +96,47 @@ export const getUserTiktokProfileService = async (userId: string) => {
   return fetchTiktokProfile(connection.tiktokAccessToken);
 };
 
-export const uploadToTiktokService = async () => {};
+export const uploadToTiktokService = async (
+  userId: string,
+  videoUrl: string,
+  title: string,
+) => {
+  const connection = await getUserTiktokAccessToken(userId);
+  if (!connection)
+    throw new ApiError(
+      404,
+      "TikTok account not connected",
+      "TIKTOK_NOT_CONNECTED",
+    );
+  const res = await fetch(
+    "https://open.tiktokapis.com/v2/post/publish/video/init/",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${connection.tiktokAccessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify({
+        post_info: {
+          title,
+          privacy_level: "SELF_ONLY",
+          disable_duet: false,
+          disable_comment: false,
+          disable_stitch: false,
+          video_cover_timestamp_ms: 1000,
+        },
+        source_info: {
+          source: "PULL_FROM_URL",
+          video_url: videoUrl,
+        },
+      }),
+    },
+  );
+  const data = await res.json();
+  if (data.error?.code !== "ok") {
+    throw new Error(
+      `TikTok init failed: ${data.error.code} — ${data.error.message}`,
+    );
+  }
+  return data.data.publish_id;
+};

@@ -35,7 +35,7 @@ export async function compositeVideo(pipelineId: string, scenes: Scene[]): Promi
     "-map", "1:a",
     "-c:v", "libx264",
     "-c:a", "aac",
-    "-vf", `subtitles=${srtPath}`,
+    "-vf", `scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,subtitles=${srtPath}`,
     "-t", duration.toString(),
     output,
   ]);

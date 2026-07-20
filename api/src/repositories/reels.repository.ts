@@ -3,7 +3,11 @@ import Reels from "../models/reels.model";
 import { ScriptOutput } from "../schema/script-writer.schema";
 import { VideoSpec } from "../schema/video-spec.schema";
 
-export const createPipeline = (userId: string, topic: string, claudeModel: string) => {
+export const createPipeline = (
+  userId: string,
+  topic: string,
+  claudeModel: string,
+) => {
   return Reels.create({
     userId,
     topic,
@@ -88,10 +92,27 @@ export const saveAudioSpec = async (
   await pipeline.save();
 };
 
-export const saveVideoOutput = async (pipelineId: string, userId: string, videoFilePath: string) => {
+export const saveVideoOutput = async (
+  pipelineId: string,
+  userId: string,
+  s3key: string,
+) => {
   const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
   if (!pipeline) throw new Error("Reel not found");
   pipeline.pipelineStatus = "video_generated";
+  pipeline.s3key = s3key;
+  await pipeline.save();
+};
+
+export const publishToTiktok = async (
+  pipelineId: string,
+  userId: string,
+  tiktokPublishId: string,
+) => {
+  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
+  if (!pipeline) throw new Error("Reel not found");
+  pipeline.tiktokPublishId = tiktokPublishId;
+  pipeline.pipelineStatus = "published";
   await pipeline.save();
 };
 

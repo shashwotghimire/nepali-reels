@@ -2,6 +2,7 @@ import {
   createPipeline,
   findPipelineById,
   markPipelineAsFailed,
+  publishToTiktok,
   saveAudioSpec,
   saveDraftScript,
   saveFinalScript,
@@ -14,13 +15,26 @@ import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
 import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
 import { compositeVideo } from "../../helpers/video.helper";
+import { uploadToS3 } from "../s3.service";
+import { uploadToTiktokService } from "../tiktok.service";
 
-export const initPipelineService = async (userId: string, topic: string, model: string) => {
+export const initPipelineService = async (
+  userId: string,
+  topic: string,
+  model: string,
+) => {
   return await createPipeline(userId, topic, model);
 };
 
-export const createPipelineService = async (userId: string, pipelineId: string, topic: string, model: string) => {
-  console.log(`[pipeline:${pipelineId}] starting pipeline for topic: "${topic}" with model: ${model}`);
+export const createPipelineService = async (
+  userId: string,
+  pipelineId: string,
+  topic: string,
+  model: string,
+) => {
+  console.log(
+    `[pipeline:${pipelineId}] starting pipeline for topic: "${topic}" with model: ${model}`,
+  );
 
   console.log(`[pipeline:${pipelineId}] generating draft script...`);
   const draftScript = await scriptGeneratorAgent(topic, model);
@@ -31,7 +45,9 @@ export const createPipelineService = async (userId: string, pipelineId: string, 
   console.log(`[pipeline:${pipelineId}] running fact check...`);
   const factCheck = await factCheckerAgent(draftScript, model);
   console.log(`final script: \n${JSON.stringify(factCheck)}`);
-  console.log(`[pipeline:${pipelineId}] fact check verdict: ${factCheck?.verdict}`);
+  console.log(
+    `[pipeline:${pipelineId}] fact check verdict: ${factCheck?.verdict}`,
+  );
 
   let finalScript;
   if (factCheck?.verdict === "pass") {
@@ -68,8 +84,27 @@ export const createPipelineService = async (userId: string, pipelineId: string, 
 
   console.log(`[pipeline:${pipelineId}] compositing video...`);
   const videoFilePath = await compositeVideo(pipelineId, videoSpec.scenes);
-  await saveVideoOutput(pipelineId, userId, videoFilePath);
-  console.log(`[pipeline:${pipelineId}] video composited — pipeline complete`);
+  console.log(`[pipeline:${pipelineId}] video composited, uploading to s3`);
+  const { key, url } = await uploadToS3(videoFilePath, pipelineId);
+  console.log("Uploaded to S3");
+  await saveVideoOutput(pipelineId, userId, key);
+
+  try {
+    console.log(`[pipeline:${pipelineId}] publishing to TikTok...`);
+    const tiktokPublishId = await uploadToTiktokService(
+      userId,
+      `https://${url}`,
+      finalScript.titleOptions[0]!,
+    );
+    await publishToTiktok(pipelineId, userId, tiktokPublishId);
+    console.log(
+      `[pipeline:${pipelineId}] TikTok publish initiated — publishId: ${tiktokPublishId}`,
+    );
+  } catch (err: unknown) {
+    console.warn(
+      `[pipeline:${pipelineId}] TikTok publish skipped: ${err instanceof Error ? err.message : err}`,
+    );
+  }
 
   return await findPipelineById(pipelineId, userId);
 };

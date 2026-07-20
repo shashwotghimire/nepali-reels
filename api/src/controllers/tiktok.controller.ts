@@ -5,6 +5,7 @@ import {
   exchangeCodeForToken,
   getUserTiktokConnectionDetailsService,
   disconnectTiktokService,
+  uploadToTiktokService,
 } from "../services/tiktok.service";
 import { ApiResponse } from "../utils/ApiResponse.util";
 import { ApiError } from "../utils/ApiError.util";
@@ -73,5 +74,13 @@ export const disconnectTiktok = asyncHandler(
   async (req: Request, res: Response) => {
     await disconnectTiktokService(res.locals.user.id);
     res.status(200).json(new ApiResponse(true, "TikTok account disconnected.", "TikTok account disconnected."));
+  },
+);
+
+export const publishVideo = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { videoUrl, title } = req.body;
+    const publishId = await uploadToTiktokService(res.locals.user.id, videoUrl, title);
+    res.status(200).json(new ApiResponse(true, "Video published to TikTok.", { publishId }));
   },
 );

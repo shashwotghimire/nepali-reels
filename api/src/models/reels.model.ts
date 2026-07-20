@@ -16,6 +16,7 @@ type PipelineStatus =
   | "video_spec_generated"
   | "sound_generated"
   | "video_generated"
+  | "published"
   | "failed";
 
 export class Reels extends Model<
@@ -31,6 +32,8 @@ export class Reels extends Model<
   declare videoSpec: CreationOptional<object | null>;
   declare soundSpec: CreationOptional<object | null>;
   declare pipelineStatus: PipelineStatus;
+  declare s3key: CreationOptional<string | null>;
+  declare tiktokPublishId: CreationOptional<string | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -81,10 +84,19 @@ Reels.init(
         "video_spec_generated",
         "sound_generated",
         "video_generated",
+        "published",
         "failed",
       ),
       allowNull: false,
       defaultValue: "queued",
+    },
+    s3key: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    tiktokPublishId: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
