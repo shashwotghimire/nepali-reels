@@ -8,7 +8,9 @@ import { initPipelineService } from "../services/pipeline/pipeline.service";
 import {
   getReelsService,
   getPipelineByIdService,
+  deletePipelineService,
 } from "../services/reels.service";
+import { getS3PresignedUrl } from "../services/s3.service";
 
 export const getPipelineById = asyncHandler(
   async (req: Request, res: Response) => {
@@ -87,6 +89,17 @@ export const getPipelineVideo = asyncHandler(
       return;
     }
 
+    if (pipeline.s3key) {
+      if (process.env.AWS_CLOUDFRONT_DOMAIN) {
+        const cdnUrl = `https://${process.env.AWS_CLOUDFRONT_DOMAIN}/${pipeline.s3key}`;
+        res.redirect(cdnUrl);
+      } else {
+        const presignedUrl = await getS3PresignedUrl(pipeline.s3key);
+        res.redirect(presignedUrl);
+      }
+      return;
+    }
+
     const videoPath = path.resolve(`src/video/${id}-output.mp4`);
     if (!fs.existsSync(videoPath)) {
       res
@@ -116,6 +129,15 @@ export const getPipelineVideo = asyncHandler(
       res.status(200);
       fs.createReadStream(videoPath).pipe(res);
     }
+  },
+);
+
+export const deletePipeline = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = res.locals.user.id;
+    const id = req.params.id as string;
+    await deletePipelineService(userId, id);
+    res.status(200).json(new ApiResponse(true, "Pipeline deleted successfully", null));
   },
 );
 

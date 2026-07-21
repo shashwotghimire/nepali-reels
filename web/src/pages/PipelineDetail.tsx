@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetPipelineById } from "@/hooks/api/usePipeline";
+import { usePublishToTiktok } from "@/hooks/api/useTiktok";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +9,7 @@ import {
   getPipelineAudioUrl,
   getPipelineVideoUrl,
 } from "@/services/pipeline.service";
+import TikTokIcon from "@/components/connections/TikTokIcon";
 import type { ScriptOutput, VideoSpec } from "@/types/api/pipeline-api.types";
 
 function ScriptSection({
@@ -193,6 +195,7 @@ export default function PipelineDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data, isPending, error } = useGetPipelineById(id!);
+  const { mutate: publishToTiktok, isPending: isPublishing } = usePublishToTiktok(id!);
 
   if (isPending) {
     return (
@@ -241,9 +244,8 @@ export default function PipelineDetail() {
           {data.videoSpec && <VideoSpecSection spec={data.videoSpec} />}
         </div>
 
-        <div className="space-y-6 sticky top-6">
-          {(data.pipelineStatus === "sound_generated" ||
-            data.pipelineStatus === "video_generated") && (
+        <div className="space-y-6 sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto">
+          {data.pipelineStatus === "sound_generated" && (
             <section className="space-y-2">
               <h2 className="text-base font-semibold">Audio</h2>
               <audio
@@ -254,15 +256,42 @@ export default function PipelineDetail() {
               />
             </section>
           )}
-          {data.pipelineStatus === "video_generated" && (
+          {(data.pipelineStatus === "video_generated" ||
+            data.pipelineStatus === "publish_pending" ||
+            data.pipelineStatus === "published") && (
             <section className="space-y-2">
               <h2 className="text-base font-semibold">Video</h2>
               <video
                 controls
                 src={getPipelineVideoUrl(data.id)}
-                crossOrigin="use-credentials"
                 className="w-full max-w-xs rounded-lg aspect-9/16 bg-black"
               />
+              {(data.pipelineStatus === "video_generated" || data.pipelineStatus === "publish_pending") && data.s3key && (
+                <Button
+                  className="w-full"
+                  disabled={isPublishing || data.pipelineStatus === "publish_pending"}
+                  onClick={() =>
+                    publishToTiktok({
+                      pipelineId: data.id,
+                      videoUrl: `https://${import.meta.env.VITE_CDN_DOMAIN}/${data.s3key}`,
+                      title:
+                        data.finalScript?.titleOptions[0] ??
+                        data.draftScript?.titleOptions[0] ??
+                        data.topic,
+                    })
+                  }
+                >
+                  {(isPublishing || data.pipelineStatus === "publish_pending") ? (
+                    <Spinner className="size-4 mr-2" />
+                  ) : (
+                    <TikTokIcon />
+                  )}
+                  {(isPublishing || data.pipelineStatus === "publish_pending") ? "Publishing to TikTok…" : "Publish to TikTok"}
+                </Button>
+              )}
+{data.pipelineStatus === "published" && (
+                <p className="text-xs text-muted-foreground text-center">Published to TikTok</p>
+              )}
             </section>
           )}
         </div>

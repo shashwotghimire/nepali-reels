@@ -9,5 +9,8 @@ export const PIPELINE_STATUS_VARIANT: Record<
   script_finalised: "secondary",
   video_spec_generated: "default",
   sound_generated: "default",
+  video_generated: "default",
+  publish_pending: "secondary",
+  published: "default",
   failed: "destructive",
 };

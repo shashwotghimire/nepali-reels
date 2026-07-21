@@ -37,3 +37,7 @@ export const generateScriptService = async (body: GenerateScriptRequest) => {
 
 export const getPipelineVideoUrl = (id: string) =>
   `${import.meta.env.VITE_API_BASE_URL}/api/pipeline/${id}/video`;
+
+export const deletePipelineService = async (id: string) => {
+  await axiosInstance.delete(`/api/pipeline/${id}`);
+};

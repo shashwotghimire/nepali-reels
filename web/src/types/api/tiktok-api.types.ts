@@ -14,3 +14,13 @@ export interface UserTiktokConnectionDetailsResponse {
   tiktokUserId: string | null;
   profile: TikTokUserProfile | null;
 }
+
+export interface PublishToTiktokRequest {
+  pipelineId: string;
+  videoUrl: string;
+  title: string;
+}
+
+export interface PublishToTiktokResponse {
+  publishId: string;
+}

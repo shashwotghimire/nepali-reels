@@ -112,7 +112,7 @@ export const publishToTiktok = async (
   const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
   if (!pipeline) throw new Error("Reel not found");
   pipeline.tiktokPublishId = tiktokPublishId;
-  pipeline.pipelineStatus = "published";
+  pipeline.pipelineStatus = "publish_pending";
   await pipeline.save();
 };
 
@@ -132,16 +132,34 @@ export const findPipelineById = (pipelineId: string, userId: string) => {
   });
 };
 
+export const findPipelineByPublishId = (tiktokPublishId: string) => {
+  return Reels.findOne({ where: { tiktokPublishId } });
+};
+
+export const deletePipelineById = async (pipelineId: string, userId: string) => {
+  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
+  if (!pipeline) throw new Error("Reel not found");
+  await pipeline.destroy();
+};
+
 export const findAllReelsOfUser = (
   userId: string,
   limit: number,
   offset: number,
   search?: string,
 ) => {
-  const where: Record<string, unknown> = { userId };
-  if (search) {
-    where.topic = { [Op.iLike]: `%${search}%` };
-  }
+  const sanitized = search?.replace(/'/g, "''");
+  const where = search
+    ? {
+        userId,
+        [Op.or]: [
+          { topic: { [Op.iLike]: `%${search}%` } },
+          Reels.sequelize!.literal(
+            `EXISTS (SELECT 1 FROM jsonb_array_elements_text("finalScript"->'hashtags') AS h WHERE h ILIKE '%${sanitized}%')`,
+          ),
+        ],
+      }
+    : { userId };
   return Reels.findAndCountAll({
     where,
     order: [["createdAt", "DESC"]],

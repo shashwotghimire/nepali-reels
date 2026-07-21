@@ -7,6 +7,7 @@ import { errorHandler } from "./middlewares/error.middleware";
 import tiktokRouter from "./routes/tiktok.route";
 import userRoute from "./routes/user.route";
 import pipelineRouter from "./routes/pipeline.route";
+import { tiktokWebhook, tiktokWebhookVerify } from "./webhooks/tiktok.webhook";
 
 const app = express();
 
@@ -25,6 +26,8 @@ app.use(cookieParser(process.env.COOKIE_SECRET!));
 app.use(express.json());
 
 app.all("/api/auth/*splat", toNodeHandler(auth));
+app.get("/api/webhooks/tiktok", tiktokWebhookVerify);
+app.post("/api/webhooks/tiktok", tiktokWebhook);
 app.use("/api/users", userRoute);
 app.use("/api/tiktok", tiktokRouter);
 app.use("/api/pipeline", pipelineRouter);

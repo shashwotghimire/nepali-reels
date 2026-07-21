@@ -79,8 +79,8 @@ export const disconnectTiktok = asyncHandler(
 
 export const publishVideo = asyncHandler(
   async (req: Request, res: Response) => {
-    const { videoUrl, title } = req.body;
-    const publishId = await uploadToTiktokService(res.locals.user.id, videoUrl, title);
+    const { pipelineId, videoUrl, title } = req.body;
+    const publishId = await uploadToTiktokService(res.locals.user.id, pipelineId, videoUrl, title);
     res.status(200).json(new ApiResponse(true, "Video published to TikTok.", { publishId }));
   },
 );

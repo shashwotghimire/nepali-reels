@@ -5,7 +5,9 @@ import {
   getUserTiktokConnectionDetails,
   getUserTiktokAccessToken,
 } from "../repositories/tiktok.repository";
+import { publishToTiktok } from "../repositories/reels.repository";
 import { ApiError } from "../utils/ApiError.util";
+import { enqueueTiktokStatusPoll } from "../queue/tiktok.queue";
 
 export const buildAuthUrl = () => {
   const state = generateToken();
@@ -98,6 +100,7 @@ export const getUserTiktokProfileService = async (userId: string) => {
 
 export const uploadToTiktokService = async (
   userId: string,
+  pipelineId: string,
   videoUrl: string,
   title: string,
 ) => {
@@ -138,5 +141,8 @@ export const uploadToTiktokService = async (
       `TikTok init failed: ${data.error.code} — ${data.error.message}`,
     );
   }
-  return data.data.publish_id;
+  const publishId = data.data.publish_id;
+  await publishToTiktok(pipelineId, userId, publishId);
+  await enqueueTiktokStatusPoll(publishId, pipelineId, userId);
+  return publishId;
 };

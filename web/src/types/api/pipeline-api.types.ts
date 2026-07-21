@@ -5,6 +5,8 @@ export type PipelineStatus =
   | "video_spec_generated"
   | "sound_generated"
   | "video_generated"
+  | "publish_pending"
+  | "published"
   | "failed";
 
 interface HookOption {
@@ -74,6 +76,8 @@ export interface Reel {
   videoSpec: VideoSpec | null;
   soundSpec: object | null;
   pipelineStatus: PipelineStatus;
+  s3key: string | null;
+  videoUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -16,6 +16,7 @@ type PipelineStatus =
   | "video_spec_generated"
   | "sound_generated"
   | "video_generated"
+  | "publish_pending"
   | "published"
   | "failed";
 
@@ -84,6 +85,7 @@ Reels.init(
         "video_spec_generated",
         "sound_generated",
         "video_generated",
+        "publish_pending",
         "published",
         "failed",
       ),

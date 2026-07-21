@@ -1,8 +1,8 @@
+import fs from "fs";
 import {
   createPipeline,
   findPipelineById,
   markPipelineAsFailed,
-  publishToTiktok,
   saveAudioSpec,
   saveDraftScript,
   saveFinalScript,
@@ -88,15 +88,18 @@ export const createPipelineService = async (
   const { key, url } = await uploadToS3(videoFilePath, pipelineId);
   console.log("Uploaded to S3");
   await saveVideoOutput(pipelineId, userId, key);
+  fs.unlink(videoFilePath, (err) => {
+    if (err) console.warn(`[pipeline:${pipelineId}] failed to delete local video: ${err.message}`);
+  });
 
   try {
     console.log(`[pipeline:${pipelineId}] publishing to TikTok...`);
     const tiktokPublishId = await uploadToTiktokService(
       userId,
+      pipelineId,
       `https://${url}`,
       finalScript.titleOptions[0]!,
     );
-    await publishToTiktok(pipelineId, userId, tiktokPublishId);
     console.log(
       `[pipeline:${pipelineId}] TikTok publish initiated — publishId: ${tiktokPublishId}`,
     );
