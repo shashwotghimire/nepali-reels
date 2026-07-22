@@ -7,6 +7,7 @@ import { errorHandler } from "./middlewares/error.middleware";
 import tiktokRouter from "./routes/tiktok.route";
 import userRoute from "./routes/user.route";
 import pipelineRouter from "./routes/pipeline.route";
+import analyticsRouter from "./routes/analytics.route";
 import { tiktokWebhook, tiktokWebhookVerify } from "./webhooks/tiktok.webhook";
 
 const app = express();
@@ -31,6 +32,7 @@ app.post("/api/webhooks/tiktok", tiktokWebhook);
 app.use("/api/users", userRoute);
 app.use("/api/tiktok", tiktokRouter);
 app.use("/api/pipeline", pipelineRouter);
+app.use("/api/analytics", analyticsRouter);
 
 app.use(errorHandler);
 export default app;

@@ -2,6 +2,9 @@ import { enqueueAnalyticsJob, analyticsQueue } from "./analytics.queue";
 import Reels from "../models/reels.model";
 
 export const setupAnalyticsScheduler = async () => {
+  const existing = await analyticsQueue.getRepeatableJobs();
+  await Promise.all(existing.map((j) => analyticsQueue.removeRepeatableByKey(j.key)));
+
   await analyticsQueue.add(
     "weekly-analytics",
     {},

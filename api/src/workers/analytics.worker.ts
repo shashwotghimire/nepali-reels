@@ -24,10 +24,11 @@ const loadDummyInsights = (): TikTokVideoInsight[] => {
     .split("\n")
     .slice(1)
     .map((line) => {
-      const [video_id, create_time, , duration, view_count, like_count, comment_count, share_count] =
+      const [video_id, create_time, video_description, duration, view_count, like_count, comment_count, share_count] =
         line.split(",");
       return {
         video_id: video_id!,
+        video_description: video_description ?? "",
         create_time: Number(create_time),
         view_count: Number(view_count),
         like_count: Number(like_count),
@@ -79,14 +80,14 @@ export const analyticsWorker = new Worker(
       return;
     }
 
-    const model = CLAUDE_MODELS["Haiku 4.5"];
+    const model = CLAUDE_MODELS["Sonnet 4.5"];
     console.log(`[analytics:worker] running analyticsAgent (model=${model})`);
     const report = await analyticsAgent(rawData, model);
     console.log(`[analytics:worker] analyticsAgent done — top performer: ${report.top_performer_id}, avg engagement: ${report.avg_engagement_rate}`);
 
     console.log("[analytics:worker] running improverAgent...");
     const suggestions = await improverAgent(report, model);
-    console.log(`[analytics:worker] improverAgent done — ${suggestions.length} suggestion(s)`);
+    console.log(`[analytics:worker] improverAgent done — ${suggestions.suggestedTopics.length} suggested topic(s)`);
 
     await Analytics.create({
       userId,

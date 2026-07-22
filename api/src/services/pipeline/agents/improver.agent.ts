@@ -1,20 +1,17 @@
 import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { z } from "zod";
 import client from "../../../configs/llm.config";
 import { improverPrompt } from "../../../llm/improver.prompt";
-import { SuggestionsSchema, type Suggestions } from "../../../schema/analytics.schema";
+import { ImproverOutputSchema, type ImproverOutput } from "../../../schema/analytics.schema";
 import type { AnalyticsReport } from "../../../schema/analytics.schema";
 import { tavliySearchTool } from "../../../tools/tavily-search.tool";
 import { runTavilySearch } from "../../../configs/tavily.config";
 import { FACT_CHECK_RUNS } from "../../../constants/constant";
 
-const SuggestionsWrapperSchema = z.object({ suggestions: SuggestionsSchema });
-
 export const improverAgent = async (
   report: AnalyticsReport,
   model: string,
-): Promise<Suggestions> => {
+): Promise<ImproverOutput> => {
   const messages: MessageParam[] = [
     { role: "user", content: JSON.stringify(report) },
   ];
@@ -23,11 +20,11 @@ export const improverAgent = async (
     for (let i = 0; i < FACT_CHECK_RUNS; i++) {
       const response = await client.messages.parse({
         model,
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: improverPrompt,
         tools: [tavliySearchTool],
         output_config: {
-          format: zodOutputFormat(SuggestionsWrapperSchema),
+          format: zodOutputFormat(ImproverOutputSchema),
         },
         messages,
       });
@@ -39,7 +36,7 @@ export const improverAgent = async (
         if (!response.parsed_output) {
           throw new Error("Improver agent returned null output");
         }
-        return response.parsed_output.suggestions;
+        return response.parsed_output;
       }
 
       const toolResults = await Promise.all(

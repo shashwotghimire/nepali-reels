@@ -11,7 +11,7 @@ export const analyticsAgent = async (
   try {
     const response = await client.messages.parse({
       model,
-      max_tokens: 2048,
+      max_tokens: 8192,
       system: analyticsPrompt,
       output_config: {
         format: zodOutputFormat(AnalyticsReportSchema),
