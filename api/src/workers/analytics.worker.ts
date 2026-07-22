@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Worker } from "bullmq";
 import { connection } from "../configs/redis.config";
+import { runAnalyticsFanout } from "../queue/analytics.scheduler";
 import { getUserTiktokAccessToken } from "../repositories/tiktok.repository";
 import Reels from "../models/reels.model";
 import Analytics from "../models/analytics.model";
@@ -26,7 +27,7 @@ const loadDummyInsights = (): TikTokVideoInsight[] => {
       const [video_id, create_time, , duration, view_count, like_count, comment_count, share_count] =
         line.split(",");
       return {
-        video_id,
+        video_id: video_id!,
         create_time: Number(create_time),
         view_count: Number(view_count),
         like_count: Number(like_count),
@@ -40,13 +41,24 @@ const loadDummyInsights = (): TikTokVideoInsight[] => {
 export const analyticsWorker = new Worker(
   "analytics",
   async (job) => {
+    console.log(`[analytics:worker] picked up job "${job.name}" (id=${job.id})`);
+
+    if (job.name === "weekly-analytics") {
+      console.log("[analytics:worker] triggering fanout...");
+      await runAnalyticsFanout();
+      console.log("[analytics:worker] fanout complete");
+      return;
+    }
+
     const { userId } = job.data as { userId: string };
+    console.log(`[analytics:worker] processing user ${userId}`);
 
     const connection = await getUserTiktokAccessToken(userId);
     if (!connection) {
-      console.warn(`[analytics] no TikTok token for user ${userId}, skipping`);
+      console.warn(`[analytics:worker] no TikTok token for user ${userId} — skipping`);
       return;
     }
+    console.log(`[analytics:worker] TikTok token found for user ${userId}`);
 
     const reels = await Reels.findAll({
       where: { userId, pipelineStatus: "published" },
@@ -54,20 +66,27 @@ export const analyticsWorker = new Worker(
     });
 
     if (reels.length === 0) {
-      console.log(`[analytics] no published reels for user ${userId}, skipping`);
+      console.log(`[analytics:worker] no published reels for user ${userId} — skipping`);
       return;
     }
+    console.log(`[analytics:worker] found ${reels.length} published reel(s) for user ${userId}`);
 
     const rawData = loadDummyInsights();
+    console.log(`[analytics:worker] loaded ${rawData.length} dummy insights from CSV`);
 
     if (rawData.length === 0) {
-      console.warn(`[analytics] TikTok returned no video data for user ${userId}`);
+      console.warn(`[analytics:worker] no video data for user ${userId} — skipping`);
       return;
     }
 
     const model = CLAUDE_MODELS["Haiku 4.5"];
+    console.log(`[analytics:worker] running analyticsAgent (model=${model})`);
     const report = await analyticsAgent(rawData, model);
+    console.log(`[analytics:worker] analyticsAgent done — top performer: ${report.top_performer_id}, avg engagement: ${report.avg_engagement_rate}`);
+
+    console.log("[analytics:worker] running improverAgent...");
     const suggestions = await improverAgent(report, model);
+    console.log(`[analytics:worker] improverAgent done — ${suggestions.length} suggestion(s)`);
 
     await Analytics.create({
       userId,
@@ -77,11 +96,19 @@ export const analyticsWorker = new Worker(
       fetchedAt: new Date(),
     });
 
-    console.log(`[analytics] completed for user ${userId}`);
+    console.log(`[analytics:worker] saved analytics record for user ${userId} ✓`);
   },
   { connection: connection, concurrency: 3 },
 );
 
+analyticsWorker.on("active", (job) => {
+  console.log(`[analytics:worker] job active — "${job.name}" (id=${job.id})`);
+});
+
+analyticsWorker.on("completed", (job) => {
+  console.log(`[analytics:worker] job completed — "${job.name}" (id=${job.id})`);
+});
+
 analyticsWorker.on("failed", (job, err) => {
-  console.error(`[analytics] job ${job?.id} failed:`, err);
+  console.error(`[analytics:worker] job failed — "${job?.name}" (id=${job?.id}):`, err.message);
 });

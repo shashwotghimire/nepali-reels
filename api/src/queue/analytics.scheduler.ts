@@ -8,7 +8,7 @@ export const setupAnalyticsScheduler = async () => {
     { repeat: { pattern: "0 9 * * 1" }, removeOnComplete: true },
   );
 
-  console.log("[analytics] weekly scheduler registered (0 9 * * 1 UTC)");
+  console.log("[analytics] scheduler registered — Mondays 9am UTC (0 9 * * 1)");
 };
 
 export const runAnalyticsFanout = async () => {
@@ -23,6 +23,8 @@ export const runAnalyticsFanout = async () => {
     return;
   }
 
-  await Promise.all(rows.map((r) => enqueueAnalyticsJob(r.userId as string)));
-  console.log(`[analytics] fanout: enqueued jobs for ${rows.length} users`);
+  const userIds = rows.map((r) => r.userId as string);
+  console.log(`[analytics:fanout] enqueueing jobs for ${userIds.length} user(s): ${userIds.join(", ")}`);
+  await Promise.all(userIds.map(enqueueAnalyticsJob));
+  console.log(`[analytics:fanout] all jobs enqueued ✓`);
 };
