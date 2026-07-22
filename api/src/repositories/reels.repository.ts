@@ -104,6 +104,17 @@ export const saveVideoOutput = async (
   await pipeline.save();
 };
 
+export const saveThumbnailUrl = async (
+  pipelineId: string,
+  userId: string,
+  thumbnailUrl: string,
+) => {
+  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
+  if (!pipeline) throw new Error("Reel not found");
+  pipeline.thumbnailUrl = thumbnailUrl;
+  await pipeline.save();
+};
+
 export const publishToTiktok = async (
   pipelineId: string,
   userId: string,

@@ -103,6 +103,7 @@ export const uploadToTiktokService = async (
   pipelineId: string,
   videoUrl: string,
   title: string,
+  thumbnailUrl?: string,
 ) => {
   const connection = await getUserTiktokAccessToken(userId);
   if (!connection)
@@ -126,7 +127,9 @@ export const uploadToTiktokService = async (
           disable_duet: false,
           disable_comment: false,
           disable_stitch: false,
-          video_cover_timestamp_ms: 1000,
+          ...(thumbnailUrl
+            ? { cover_url: thumbnailUrl }
+            : { video_cover_timestamp_ms: 1000 }),
         },
         source_info: {
           source: "PULL_FROM_URL",

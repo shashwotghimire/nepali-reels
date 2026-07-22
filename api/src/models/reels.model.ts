@@ -35,6 +35,7 @@ export class Reels extends Model<
   declare pipelineStatus: PipelineStatus;
   declare s3key: CreationOptional<string | null>;
   declare tiktokPublishId: CreationOptional<string | null>;
+  declare thumbnailUrl: CreationOptional<string | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -97,6 +98,10 @@ Reels.init(
       allowNull: true,
     },
     tiktokPublishId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    thumbnailUrl: {
       type: DataTypes.STRING,
       allowNull: true,
     },

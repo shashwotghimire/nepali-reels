@@ -15,8 +15,10 @@ import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
 import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
 import { compositeVideo } from "../../helpers/video.helper";
-import { uploadToS3 } from "../s3.service";
+import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
 import { uploadToTiktokService } from "../tiktok.service";
+import { generateThumbnailAgent } from "./agents/thumbnail.agent";
+import { saveThumbnailUrl } from "../../repositories/reels.repository";
 
 export const initPipelineService = async (
   userId: string,
@@ -89,8 +91,28 @@ export const createPipelineService = async (
   console.log("Uploaded to S3");
   await saveVideoOutput(pipelineId, userId, key);
   fs.unlink(videoFilePath, (err) => {
-    if (err) console.warn(`[pipeline:${pipelineId}] failed to delete local video: ${err.message}`);
+    if (err)
+      console.warn(
+        `[pipeline:${pipelineId}] failed to delete local video: ${err.message}`,
+      );
   });
+
+  let thumbnailUrl: string | undefined;
+  try {
+    console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
+    const thumbnailBuffer = await generateThumbnailAgent(videoSpec, model);
+    const { url: tUrl } = await uploadThumbnailToS3(
+      thumbnailBuffer,
+      pipelineId,
+    );
+    thumbnailUrl = tUrl;
+    await saveThumbnailUrl(pipelineId, userId, thumbnailUrl);
+    console.log(`[pipeline:${pipelineId}] thumbnail uploaded: ${thumbnailUrl}`);
+  } catch (err) {
+    console.warn(
+      `[pipeline:${pipelineId}] thumbnail generation skipped: ${err instanceof Error ? err.message : err}`,
+    );
+  }
 
   try {
     console.log(`[pipeline:${pipelineId}] publishing to TikTok...`);
@@ -99,6 +121,7 @@ export const createPipelineService = async (
       pipelineId,
       `https://${url}`,
       finalScript.titleOptions[0]!,
+      thumbnailUrl,
     );
     console.log(
       `[pipeline:${pipelineId}] TikTok publish initiated — publishId: ${tiktokPublishId}`,

@@ -44,6 +44,25 @@ export const getS3PresignedUrl = async (key: string, expiresIn = 3600) => {
   return getSignedUrl(s3, command, { expiresIn });
 };
 
+export const uploadThumbnailToS3 = async (
+  imageBuffer: Buffer,
+  pipelineId: string,
+) => {
+  const fileKey = `thumbnails/${pipelineId}.jpg`;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET!,
+      Key: fileKey,
+      Body: imageBuffer,
+      ContentType: "image/jpeg",
+    }),
+  );
+  return {
+    key: fileKey,
+    url: `https://${process.env.AWS_CLOUDFRONT_DOMAIN}/thumbnails/${pipelineId}.jpg`,
+  };
+};
+
 export const deleteFromS3 = async (key: string) => {
   const data = await s3.send(
     new DeleteObjectCommand({
