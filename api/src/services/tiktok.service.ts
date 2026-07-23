@@ -103,7 +103,6 @@ export const uploadToTiktokService = async (
   pipelineId: string,
   videoUrl: string,
   title: string,
-  thumbnailUrl?: string,
 ) => {
   const connection = await getUserTiktokAccessToken(userId);
   if (!connection)
@@ -112,6 +111,16 @@ export const uploadToTiktokService = async (
       "TikTok account not connected",
       "TIKTOK_NOT_CONNECTED",
     );
+
+  const postInfo: Record<string, unknown> = {
+    title,
+    privacy_level: "SELF_ONLY",
+    disable_duet: false,
+    disable_comment: false,
+    disable_stitch: false,
+    video_cover_timestamp_ms: 0,
+  };
+
   const res = await fetch(
     "https://open.tiktokapis.com/v2/post/publish/video/init/",
     {
@@ -121,16 +130,7 @@ export const uploadToTiktokService = async (
         "Content-Type": "application/json; charset=UTF-8",
       },
       body: JSON.stringify({
-        post_info: {
-          title,
-          privacy_level: "SELF_ONLY",
-          disable_duet: false,
-          disable_comment: false,
-          disable_stitch: false,
-          ...(thumbnailUrl
-            ? { cover_url: thumbnailUrl }
-            : { video_cover_timestamp_ms: 1000 }),
-        },
+        post_info: postInfo,
         source_info: {
           source: "PULL_FROM_URL",
           video_url: videoUrl,

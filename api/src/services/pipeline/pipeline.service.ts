@@ -14,7 +14,7 @@ import { factCheckerAgent } from "../pipeline/agents/fact-checker.agent";
 import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
 import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
-import { compositeVideo } from "../../helpers/video.helper";
+import { compositeVideo, burnThumbnailIntoVideo } from "../../helpers/video.helper";
 import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
 import { uploadToTiktokService } from "../tiktok.service";
 import { generateThumbnailAgent } from "./agents/thumbnail.agent";
@@ -84,13 +84,38 @@ export const createPipelineService = async (
   await saveAudioSpec(pipelineId, userId, soundSpec);
   console.log(`[pipeline:${pipelineId}] audio saved`);
 
+  console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
+  let thumbnailBuffer: Buffer | undefined;
+  try {
+    thumbnailBuffer = await generateThumbnailAgent(videoSpec, model);
+  } catch (err) {
+    console.warn(
+      `[pipeline:${pipelineId}] thumbnail generation skipped: ${err instanceof Error ? err.message : err}`,
+    );
+  }
+
   console.log(`[pipeline:${pipelineId}] compositing video...`);
-  const videoFilePath = await compositeVideo(pipelineId, videoSpec.scenes);
-  console.log(`[pipeline:${pipelineId}] video composited, uploading to s3`);
-  const { key, url } = await uploadToS3(videoFilePath, pipelineId);
+  const rawVideoPath = await compositeVideo(pipelineId, finalScript.captions);
+
+  let finalVideoPath = rawVideoPath;
+  if (thumbnailBuffer) {
+    console.log(`[pipeline:${pipelineId}] burning thumbnail into video...`);
+    try {
+      finalVideoPath = await burnThumbnailIntoVideo(rawVideoPath, thumbnailBuffer, pipelineId);
+      fs.unlink(rawVideoPath, () => {});
+    } catch (err) {
+      console.warn(
+        `[pipeline:${pipelineId}] thumbnail burn skipped: ${err instanceof Error ? err.message : err}`,
+      );
+      finalVideoPath = rawVideoPath;
+    }
+  }
+
+  console.log(`[pipeline:${pipelineId}] video ready, uploading to s3`);
+  const { key, url } = await uploadToS3(finalVideoPath, pipelineId);
   console.log("Uploaded to S3");
   await saveVideoOutput(pipelineId, userId, key);
-  fs.unlink(videoFilePath, (err) => {
+  fs.unlink(finalVideoPath, (err) => {
     if (err)
       console.warn(
         `[pipeline:${pipelineId}] failed to delete local video: ${err.message}`,
@@ -98,20 +123,17 @@ export const createPipelineService = async (
   });
 
   let thumbnailUrl: string | undefined;
-  try {
-    console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
-    const thumbnailBuffer = await generateThumbnailAgent(videoSpec, model);
-    const { url: tUrl } = await uploadThumbnailToS3(
-      thumbnailBuffer,
-      pipelineId,
-    );
-    thumbnailUrl = tUrl;
-    await saveThumbnailUrl(pipelineId, userId, thumbnailUrl);
-    console.log(`[pipeline:${pipelineId}] thumbnail uploaded: ${thumbnailUrl}`);
-  } catch (err) {
-    console.warn(
-      `[pipeline:${pipelineId}] thumbnail generation skipped: ${err instanceof Error ? err.message : err}`,
-    );
+  if (thumbnailBuffer) {
+    try {
+      const { url: tUrl } = await uploadThumbnailToS3(thumbnailBuffer, pipelineId);
+      thumbnailUrl = tUrl;
+      await saveThumbnailUrl(pipelineId, userId, thumbnailUrl);
+      console.log(`[pipeline:${pipelineId}] thumbnail uploaded: ${thumbnailUrl}`);
+    } catch (err) {
+      console.warn(
+        `[pipeline:${pipelineId}] thumbnail S3 upload skipped: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   try {
@@ -121,7 +143,6 @@ export const createPipelineService = async (
       pipelineId,
       `https://${url}`,
       finalScript.titleOptions[0]!,
-      thumbnailUrl,
     );
     console.log(
       `[pipeline:${pipelineId}] TikTok publish initiated — publishId: ${tiktokPublishId}`,

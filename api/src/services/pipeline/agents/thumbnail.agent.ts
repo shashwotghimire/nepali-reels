@@ -26,7 +26,7 @@ export const generateThumbnailAgent = async (
   if (!imagePrompt) throw new Error("Thumbnail prompt generation failed");
 
   const seed = Math.floor(Math.random() * 1_000_000);
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?seed=${seed}&width=576&height=1024&nologo=true`;
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?seed=${seed}&width=720&height=1280&nologo=true`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Pollinations request failed: ${response.status}`);
   const arrayBuffer = await response.arrayBuffer();

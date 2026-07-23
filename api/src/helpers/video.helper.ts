@@ -1,5 +1,6 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
+import fs from "fs";
 import { Caption } from "./srt.helper";
 import { renderCaptionFrames, cleanupCaptionFrames } from "./subtitle-renderer";
 
@@ -23,6 +24,57 @@ function scaleCaptions(captions: Caption[], actualDuration: number): Caption[] {
     startSec: c.startSec * scale,
     endSec: c.endSec * scale,
   }));
+}
+
+export async function burnThumbnailIntoVideo(
+  videoPath: string,
+  thumbnailBuffer: Buffer,
+  pipelineId: string,
+): Promise<string> {
+  const thumbPath = `src/video/${pipelineId}-thumb.jpg`;
+  const output = `src/video/${pipelineId}-with-thumb.mp4`;
+
+  await fs.promises.writeFile(thumbPath, thumbnailBuffer);
+
+  try {
+    // input 0: thumbnail image (looped for 1s)
+    // input 1: main video
+    // input 2: 1s of silent audio to pair with the thumbnail segment
+    // Probe the main video's audio sample rate and channel layout so concat streams match exactly
+    const { stdout: probeOut } = await execFileAsync("ffprobe", [
+      "-v", "error",
+      "-select_streams", "a:0",
+      "-show_entries", "stream=sample_rate,channel_layout",
+      "-of", "default=noprint_wrappers=1",
+      videoPath,
+    ]);
+    const srMatch = probeOut.match(/sample_rate=(\d+)/);
+    const clMatch = probeOut.match(/channel_layout=(\S+)/);
+    const sampleRate = srMatch ? srMatch[1] : "44100";
+    const channelLayout = clMatch ? clMatch[1] : "stereo";
+
+    await execFileAsync("ffmpeg", [
+      "-loop", "1", "-t", "1", "-i", thumbPath,
+      "-i", videoPath,
+      "-f", "lavfi", "-t", "1", "-i", `anullsrc=channel_layout=${channelLayout}:sample_rate=${sampleRate}`,
+      "-filter_complex",
+        `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=2997/100,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[vt];` +
+        `[1:v]setsar=1,format=yuv420p,setpts=PTS-STARTPTS[vm];` +
+        `[vt][vm]concat=n=2:v=1:a=0[vout];` +
+        `[2:a]aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${channelLayout},asetpts=PTS-STARTPTS[at];` +
+        `[1:a]aformat=sample_fmts=fltp:sample_rates=${sampleRate}:channel_layouts=${channelLayout},asetpts=PTS-STARTPTS[am];` +
+        `[at][am]concat=n=2:v=0:a=1[aout]`,
+      "-map", "[vout]",
+      "-map", "[aout]",
+      "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+      "-c:a", "aac",
+      output,
+    ]);
+  } finally {
+    await fs.promises.unlink(thumbPath).catch(() => {});
+  }
+
+  return output;
 }
 
 export async function compositeVideo(pipelineId: string, captions: Caption[]): Promise<string> {
