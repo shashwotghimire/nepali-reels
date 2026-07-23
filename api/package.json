@@ -36,6 +36,7 @@
     "pg": "^8.22.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.8",
+    "skia-canvas": "^3.0.8",
     "tsx": "^4.23.0",
     "typescript": "^7.0.2",
     "wav": "^1.0.2"

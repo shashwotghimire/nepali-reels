@@ -1,4 +1,15 @@
 export const STATE_COOKIE = "tiktok_oauth_state" as const;
+
+export const VIDEO_W = 1080;
+export const VIDEO_H = 1920;
+export const SUBTITLE_FONT_SIZE = 72;
+export const SUBTITLE_FONT = `bold ${SUBTITLE_FONT_SIZE}px sans-serif`;
+export const SUBTITLE_MAX_LINE_W = VIDEO_W * 0.85;
+export const SUBTITLE_LINE_HEIGHT = SUBTITLE_FONT_SIZE * 1.25;
+export const SUBTITLE_BOTTOM_MARGIN = 300;
+export const SUBTITLE_OUTLINE_WIDTH = 8;
+export const SUBTITLE_TEXT_COLOR = "#FFE600";
+export const SUBTITLE_OUTLINE_COLOR = "#000000";
 export const FACT_CHECK_RUNS = 15 as const;
 
 export const CLAUDE_MODELS = {
