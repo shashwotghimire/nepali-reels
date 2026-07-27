@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   disconnectTiktokService,
   getUserTiktokConnectionDetails,
+  getCreatorInfoService,
   publishToTiktokService,
 } from "@/services/tiktok.service";
 import type {
@@ -14,6 +15,15 @@ export const useGetTiktokConnectionDetails = () =>
   useQuery<UserTiktokConnectionDetailsResponse>({
     queryKey: ["tiktok", "status"],
     queryFn: getUserTiktokConnectionDetails,
+  });
+
+export const useGetCreatorInfo = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["tiktok", "creator-info"],
+    queryFn: getCreatorInfoService,
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
   });
 
 export const useDisconnectTiktok = () => {

@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface Props {
   bestHooks: string[];
@@ -8,25 +7,35 @@ interface Props {
 
 export function HooksAndGaps({ bestHooks, contentGaps }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Best Hooks</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {bestHooks.map((h, i) => (
-            <Badge key={i} variant="secondary">{h}</Badge>
-          ))}
+        <CardContent>
+          <ul className="space-y-1.5">
+            {bestHooks.map((h, i) => (
+              <li key={i} className="text-sm text-foreground/80 flex gap-2">
+                <span className="text-green-500 shrink-0">•</span>
+                {h}
+              </li>
+            ))}
+          </ul>
         </CardContent>
       </Card>
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Content Gaps</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {contentGaps.map((g, i) => (
-            <Badge key={i} variant="outline">{g}</Badge>
-          ))}
+        <CardContent>
+          <ul className="space-y-1.5">
+            {contentGaps.map((g, i) => (
+              <li key={i} className="text-sm text-foreground/80 flex gap-2">
+                <span className="text-orange-500 shrink-0">•</span>
+                {g}
+              </li>
+            ))}
+          </ul>
         </CardContent>
       </Card>
     </div>

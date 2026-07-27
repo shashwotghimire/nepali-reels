@@ -1,6 +1,6 @@
 ---
 type: wayfinder:prototype
-status: open
+status: closed
 blocked-by: [05]
 blocks: [08]
 ---
@@ -21,4 +21,4 @@ Suggestions come from the improver agent and are stored in `analytics_reports.su
 
 ## Resolution
 
-<!-- answer recorded here on close -->
+Dedicated `/analytics` route. Shows: 4 metric cards (avg engagement, reels tracked, top performer, report date), a summary card, a reel performance table with top badge, and a "Suggested Topics" list of `SuggestionCard`s (topic + score badge + reasoning). Latest report only — no history view. No CTA to pre-fill the create-reel form.

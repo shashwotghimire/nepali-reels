@@ -3,6 +3,7 @@ import type {
   UserTiktokConnectionDetailsResponse,
   PublishToTiktokRequest,
   PublishToTiktokResponse,
+  TikTokCreatorInfo,
 } from "@/types/api/tiktok-api.types";
 
 export const connectTiktokService = async () => {
@@ -18,6 +19,13 @@ export const getUserTiktokConnectionDetails = async () => {
     await axiosInstance.get<{ data: UserTiktokConnectionDetailsResponse }>(
       "/api/tiktok/status",
     )
+  ).data;
+  return res.data;
+};
+
+export const getCreatorInfoService = async (): Promise<TikTokCreatorInfo> => {
+  const res = (
+    await axiosInstance.post<{ data: TikTokCreatorInfo }>("/api/tiktok/creator-info")
   ).data;
   return res.data;
 };

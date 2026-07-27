@@ -1,6 +1,7 @@
 ---
 type: wayfinder:grilling
 status: open
+assigned: claude
 blocked-by: [05]
 ---
 

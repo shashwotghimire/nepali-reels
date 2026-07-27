@@ -25,6 +25,8 @@ A weekly feedback loop: a cron-triggered analytics agent pulls per-video TikTok 
 - [analytics_reports schema migration (user-level)](11-analytics-reports-schema-migration.md) — Migration and model already in place with correct user-level schema. `user` table name confirmed (better-auth convention).
 - [Improver agent contract](05-improver-agent-contract.md) — Cross-reel single call, Sonnet, 2–3 suggestions `{ topic, reasoning, score: 1–10 }`. Top scorer feeds back into the pipeline.
 - [Scheduler design](07-scheduler-design.md) — One global BullMQ repeatable job (`0 9 * * 1`), separate `"analytics"` queue, worker concurrency 3. Skip expired TikTok tokens silently.
+- [Suggestions UI design](06-suggestions-ui-design.md) — Dedicated `/analytics` route; metric cards, summary, reel performance table, suggested topics list. Latest report only, no create-reel CTA.
+- [API & DB migration spec](08-api-and-db-migration-spec.md) — `GET /api/analytics/latest` and `GET /api/analytics/history`, both auth-gated. No manual trigger. Model/migrations from tickets 10 & 11.
 
 ## Tickets
 
@@ -35,14 +37,14 @@ A weekly feedback loop: a cron-triggered analytics agent pulls per-video TikTok 
 | 03 | [Report format & charts](03-report-format-charts.md) | grilling | **closed** | 01 |
 | 04 | [Analytics agent contract](04-analytics-agent-contract.md) | grilling | **closed** | 02 |
 | 05 | [Improver agent contract](05-improver-agent-contract.md) | grilling | **closed** | 02, 03 |
-| 06 | [Suggestions UI design](06-suggestions-ui-design.md) | prototype | open | 05 |
+| 06 | [Suggestions UI design](06-suggestions-ui-design.md) | prototype | **closed** | 05 |
 | 07 | [Scheduler design](07-scheduler-design.md) | grilling | **closed** | 04, 05 |
-| 08 | [API & DB migration spec](08-api-and-db-migration-spec.md) | grilling | open | 06, 07 |
+| 08 | [API & DB migration spec](08-api-and-db-migration-spec.md) | grilling | **closed** | 06, 07 |
 | 09 | [Email digest design](09-email-digest-design.md) | grilling | open | 05 |
 | 10 | [Add report + suggestions columns migration](10-migration-add-report-suggestions.md) | task | **closed** | — |
 | 11 | [analytics_reports schema migration (user-level)](11-analytics-reports-schema-migration.md) | task | **closed** | 04 |
 
-**Frontier** (unblocked, open): **06 — Suggestions UI design**, **09 — Email digest design**. **08 — API & DB migration spec** is now unblocked once 06 closes.
+**Frontier** (unblocked, open): **09 — Email digest design** is the only remaining open ticket.
 
 ## Not yet specified
 

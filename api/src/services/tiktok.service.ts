@@ -98,11 +98,59 @@ export const getUserTiktokProfileService = async (userId: string) => {
   return fetchTiktokProfile(connection.tiktokAccessToken);
 };
 
+export const getCreatorInfoService = async (userId: string) => {
+  const connection = await getUserTiktokAccessToken(userId);
+  if (!connection)
+    throw new ApiError(
+      404,
+      "TikTok account not connected",
+      "TIKTOK_NOT_CONNECTED",
+    );
+
+  const res = await fetch(
+    "https://open.tiktokapis.com/v2/post/publish/creator_info/query/",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${connection.tiktokAccessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify({}),
+    },
+  );
+  const data = await res.json();
+  if (data.error?.code !== "ok") {
+    throw new ApiError(
+      400,
+      `TikTok creator info error: ${data.error?.message}`,
+      "TIKTOK_API_ERROR",
+    );
+  }
+
+  const c = data.data;
+  return {
+    creatorAvatarUrl: c.creator_avatar_url as string,
+    creatorUsername: c.creator_username as string,
+    creatorNickname: c.creator_nickname as string,
+    privacyLevelOptions: c.privacy_level_options as string[],
+    commentDisabled: c.comment_disabled as boolean,
+    duetDisabled: c.duet_disabled as boolean,
+    stitchDisabled: c.stitch_disabled as boolean,
+    maxVideoPostDurationSec: c.max_video_post_duration_sec as number,
+  };
+};
+
 export const uploadToTiktokService = async (
   userId: string,
   pipelineId: string,
   videoUrl: string,
   title: string,
+  privacyLevel: string,
+  disableComment: boolean,
+  disableDuet: boolean,
+  disableStitch: boolean,
+  brandContentToggle: boolean,
+  brandOrganicToggle: boolean,
 ) => {
   const connection = await getUserTiktokAccessToken(userId);
   if (!connection)
@@ -112,12 +160,24 @@ export const uploadToTiktokService = async (
       "TIKTOK_NOT_CONNECTED",
     );
 
+  // Validate the privacy level against what TikTok actually allows for this creator.
+  const creatorInfo = await getCreatorInfoService(userId);
+  if (!creatorInfo.privacyLevelOptions.includes(privacyLevel)) {
+    throw new ApiError(
+      400,
+      "Invalid privacy level for this creator",
+      "INVALID_PRIVACY_LEVEL",
+    );
+  }
+
   const postInfo: Record<string, unknown> = {
     title,
-    privacy_level: "SELF_ONLY",
-    disable_duet: false,
-    disable_comment: false,
-    disable_stitch: false,
+    privacy_level: privacyLevel,
+    disable_comment: disableComment,
+    disable_duet: disableDuet,
+    disable_stitch: disableStitch,
+    brand_content_toggle: brandContentToggle,
+    brand_organic_toggle: brandOrganicToggle,
     video_cover_timestamp_ms: 0,
   };
 
@@ -140,8 +200,10 @@ export const uploadToTiktokService = async (
   );
   const data = await res.json();
   if (data.error?.code !== "ok") {
-    throw new Error(
+    throw new ApiError(
+      400,
       `TikTok init failed: ${data.error.code} — ${data.error.message}`,
+      "TIKTOK_API_ERROR",
     );
   }
   const publishId = data.data.publish_id;

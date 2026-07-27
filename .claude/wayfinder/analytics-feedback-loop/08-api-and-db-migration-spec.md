@@ -1,6 +1,6 @@
 ---
 type: wayfinder:grilling
-status: open
+status: closed
 blocked-by: [06, 07]
 ---
 
@@ -24,4 +24,4 @@ This is the final spec ticket — it depends on knowing the schema (02), agent o
 
 ## Resolution
 
-<!-- answer recorded here on close -->
+Two routes on `/api/analytics`, both behind `authMiddleware`: `GET /latest` returns the most recent report for the user; `GET /history` returns all reports ordered by `fetchedAt` DESC. Repository: `findLatestAnalyticsByUser`, `findAllAnalyticsByUser`. No manual trigger endpoint built. Model/migrations already in place from tickets 10 and 11.

@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetPipelineById } from "@/hooks/api/usePipeline";
-import { usePublishToTiktok } from "@/hooks/api/useTiktok";
+import { usePublishToTiktok, useGetCreatorInfo } from "@/hooks/api/useTiktok";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import {
   getPipelineAudioUrl,
   getPipelineVideoUrl,
 } from "@/services/pipeline.service";
-import TikTokIcon from "@/components/connections/TikTokIcon";
+import TikTokPublishForm from "@/components/tiktok/TikTokPublishForm";
 import type { ScriptOutput, VideoSpec } from "@/types/api/pipeline-api.types";
 
 function ScriptSection({
@@ -197,6 +197,12 @@ export default function PipelineDetail() {
   const { data, isPending, error } = useGetPipelineById(id!);
   const { mutate: publishToTiktok, isPending: isPublishing } = usePublishToTiktok(id!);
 
+  const canShowPublishForm =
+    !!data &&
+    (data.pipelineStatus === "video_generated" || data.pipelineStatus === "publish_pending") &&
+    !!data.s3key;
+  const { data: creatorInfo, isPending: isLoadingCreatorInfo } = useGetCreatorInfo(canShowPublishForm);
+
   if (isPending) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -266,28 +272,40 @@ export default function PipelineDetail() {
                 src={getPipelineVideoUrl(data.id)}
                 className="w-full max-w-xs rounded-lg aspect-9/16 bg-black"
               />
-              {(data.pipelineStatus === "video_generated" || data.pipelineStatus === "publish_pending") && data.s3key && (
-                <Button
-                  className="w-full"
-                  disabled={isPublishing || data.pipelineStatus === "publish_pending"}
-                  onClick={() =>
-                    publishToTiktok({
-                      pipelineId: data.id,
-                      videoUrl: `https://${import.meta.env.VITE_CDN_DOMAIN}/${data.s3key}`,
-                      title:
-                        data.finalScript?.titleOptions[0] ??
-                        data.draftScript?.titleOptions[0] ??
-                        data.topic,
-                    })
-                  }
-                >
-                  {(isPublishing || data.pipelineStatus === "publish_pending") ? (
-                    <Spinner className="size-4 mr-2" />
-                  ) : (
-                    <TikTokIcon />
-                  )}
-                  {(isPublishing || data.pipelineStatus === "publish_pending") ? "Publishing to TikTok…" : "Publish to TikTok"}
-                </Button>
+              {canShowPublishForm && data.pipelineStatus === "publish_pending" && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner className="size-4" />
+                  Publishing to TikTok…
+                </div>
+              )}
+              {canShowPublishForm && data.pipelineStatus === "video_generated" && (
+                isLoadingCreatorInfo ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner className="size-4" />
+                    Loading TikTok info…
+                  </div>
+                ) : creatorInfo ? (
+                  <TikTokPublishForm
+                    creatorInfo={creatorInfo}
+                    initialCaption={
+                      data.finalScript?.titleOptions[0] ??
+                      data.draftScript?.titleOptions[0] ??
+                      data.topic
+                    }
+                    isPublishing={isPublishing}
+                    onPublish={(fields) =>
+                      publishToTiktok({
+                        pipelineId: data.id,
+                        videoUrl: `https://${import.meta.env.VITE_CDN_DOMAIN}/${data.s3key}`,
+                        ...fields,
+                      })
+                    }
+                  />
+                ) : (
+                  <p className="text-xs text-destructive">
+                    Failed to load TikTok creator info. Please try refreshing.
+                  </p>
+                )
               )}
 {data.pipelineStatus === "published" && (
                 <p className="text-xs text-muted-foreground text-center">Published to TikTok</p>

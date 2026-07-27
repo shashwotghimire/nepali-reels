@@ -16,7 +16,6 @@ import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
 import { compositeVideo, burnThumbnailIntoVideo } from "../../helpers/video.helper";
 import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
-import { uploadToTiktokService } from "../tiktok.service";
 import { generateThumbnailAgent } from "./agents/thumbnail.agent";
 import { saveThumbnailUrl } from "../../repositories/reels.repository";
 
@@ -136,22 +135,23 @@ export const createPipelineService = async (
     }
   }
 
-  try {
-    console.log(`[pipeline:${pipelineId}] publishing to TikTok...`);
-    const tiktokPublishId = await uploadToTiktokService(
-      userId,
-      pipelineId,
-      `https://${url}`,
-      finalScript.titleOptions[0]!,
-    );
-    console.log(
-      `[pipeline:${pipelineId}] TikTok publish initiated — publishId: ${tiktokPublishId}`,
-    );
-  } catch (err: unknown) {
-    console.warn(
-      `[pipeline:${pipelineId}] TikTok publish skipped: ${err instanceof Error ? err.message : err}`,
-    );
-  }
+  // Auto-publish removed — user triggers publish manually from the pipeline detail page.
+  // try {
+  //   console.log(`[pipeline:${pipelineId}] publishing to TikTok...`);
+  //   const tiktokPublishId = await uploadToTiktokService(
+  //     userId,
+  //     pipelineId,
+  //     `https://${url}`,
+  //     finalScript.titleOptions[0]!,
+  //   );
+  //   console.log(
+  //     `[pipeline:${pipelineId}] TikTok publish initiated — publishId: ${tiktokPublishId}`,
+  //   );
+  // } catch (err: unknown) {
+  //   console.warn(
+  //     `[pipeline:${pipelineId}] TikTok publish skipped: ${err instanceof Error ? err.message : err}`,
+  //   );
+  // }
 
   return await findPipelineById(pipelineId, userId);
 };

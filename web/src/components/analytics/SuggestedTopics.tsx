@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { SuggestedTopic } from "@/types/api/analytics-api.types";
 
@@ -8,22 +8,24 @@ interface Props {
 
 export function SuggestedTopics({ topics }: Props) {
   return (
-    <div className="space-y-3">
-      <h2 className="text-base font-semibold">Suggested Topics</h2>
-      {topics.map((topic, i) => (
-        <Card key={i}>
-          <CardContent className="pt-6 space-y-2">
-            <div className="flex items-start justify-between gap-4">
-              <p className="font-medium">{topic.title}</p>
-              <Badge variant="outline" className="shrink-0">{topic.category}</Badge>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Suggested Topics</CardTitle>
+      </CardHeader>
+      <CardContent className="divide-y">
+        {topics.map((topic, i) => (
+          <div key={i} className="py-2.5 first:pt-0 last:pb-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">{topic.title}</p>
+              <Badge variant="outline" className="text-xs px-1.5 py-0">{topic.category}</Badge>
             </div>
-            <p className="text-sm text-muted-foreground">{topic.rationale}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{topic.rationale}</p>
             {topic.notes && (
-              <p className="text-xs text-muted-foreground italic">{topic.notes}</p>
+              <p className="text-xs text-muted-foreground/70 italic mt-0.5">{topic.notes}</p>
             )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

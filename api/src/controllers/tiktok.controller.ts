@@ -5,6 +5,7 @@ import {
   exchangeCodeForToken,
   getUserTiktokConnectionDetailsService,
   disconnectTiktokService,
+  getCreatorInfoService,
   uploadToTiktokService,
 } from "../services/tiktok.service";
 import { ApiResponse } from "../utils/ApiResponse.util";
@@ -77,10 +78,38 @@ export const disconnectTiktok = asyncHandler(
   },
 );
 
+export const getCreatorInfo = asyncHandler(
+  async (req: Request, res: Response) => {
+    const info = await getCreatorInfoService(res.locals.user.id);
+    res.status(200).json(new ApiResponse(true, "Creator info fetched.", info));
+  },
+);
+
 export const publishVideo = asyncHandler(
   async (req: Request, res: Response) => {
-    const { pipelineId, videoUrl, title } = req.body;
-    const publishId = await uploadToTiktokService(res.locals.user.id, pipelineId, videoUrl, title);
+    const {
+      pipelineId,
+      videoUrl,
+      title,
+      privacyLevel,
+      disableComment,
+      disableDuet,
+      disableStitch,
+      brandContentToggle,
+      brandOrganicToggle,
+    } = req.body;
+    const publishId = await uploadToTiktokService(
+      res.locals.user.id,
+      pipelineId,
+      videoUrl,
+      title,
+      privacyLevel,
+      disableComment,
+      disableDuet,
+      disableStitch,
+      brandContentToggle,
+      brandOrganicToggle,
+    );
     res.status(200).json(new ApiResponse(true, "Video published to TikTok.", { publishId }));
   },
 );

@@ -15,10 +15,27 @@ export interface UserTiktokConnectionDetailsResponse {
   profile: TikTokUserProfile | null;
 }
 
+export interface TikTokCreatorInfo {
+  creatorAvatarUrl: string;
+  creatorUsername: string;
+  creatorNickname: string;
+  privacyLevelOptions: string[];
+  commentDisabled: boolean;
+  duetDisabled: boolean;
+  stitchDisabled: boolean;
+  maxVideoPostDurationSec: number;
+}
+
 export interface PublishToTiktokRequest {
   pipelineId: string;
   videoUrl: string;
   title: string;
+  privacyLevel: string;
+  disableComment: boolean;
+  disableDuet: boolean;
+  disableStitch: boolean;
+  brandContentToggle: boolean;
+  brandOrganicToggle: boolean;
 }
 
 export interface PublishToTiktokResponse {

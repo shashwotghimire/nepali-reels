@@ -1,7 +1,7 @@
 ---
 id: 4
 label: wayfinder:prototype
-status: open
+status: closed
 blocked_by: [1, 2, 3]
 assigned: false
 ---
@@ -15,3 +15,7 @@ Build the video compositing agent/step:
 - Integrate into the pipeline service after the TTS step
 
 Prototype with the subway surfer video to validate the approach works end-to-end.
+
+## Resolution
+
+FFmpeg via `child_process.execFile`. Single-pass command: loops/trims source video to TTS audio length, burns SRT subtitles, muxes audio, outputs H.264+AAC MP4. Integrated into `pipeline.service.ts` after the TTS step. Validated end-to-end with the subway surfer placeholder.

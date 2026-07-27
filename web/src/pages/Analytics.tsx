@@ -12,7 +12,7 @@ function Analytics() {
   const { data, isLoading, error } = useGetLatestAnalytics();
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-8">
+    <div className="p-6 max-w-4xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-semibold">Analytics</h1>
         <p className="text-muted-foreground text-sm mt-1">
@@ -36,7 +36,7 @@ function Analytics() {
 
       {data && !Array.isArray(data.suggestions) && (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <MetricCard label="Avg Engagement" value={`${(data.report.avg_engagement_rate * 100).toFixed(1)}%`} />
             <MetricCard label="Reels Tracked" value={data.report.reels.length} />
             <MetricCard label="Report Date" value={new Date(data.fetchedAt).toLocaleDateString()} />
@@ -44,10 +44,10 @@ function Analytics() {
           </div>
 
           <AnalyticsSummary summary={data.suggestions.summary} />
-          <TopicsPerformance bestTopics={data.suggestions.bestTopics} worstTopics={data.suggestions.worstTopics} />
-          <HooksAndGaps bestHooks={data.suggestions.bestHooks} contentGaps={data.suggestions.contentGaps} />
-          <ReelPerformanceTable reels={data.report.reels} topPerformerId={data.report.top_performer_id} />
           <SuggestedTopics topics={data.suggestions.suggestedTopics} />
+          <HooksAndGaps bestHooks={data.suggestions.bestHooks} contentGaps={data.suggestions.contentGaps} />
+          <TopicsPerformance bestTopics={data.suggestions.bestTopics} worstTopics={data.suggestions.worstTopics} />
+          <ReelPerformanceTable reels={data.report.reels} topPerformerId={data.report.top_performer_id} />
           <ExperimentsCard experiments={data.suggestions.experiments} />
         </>
       )}

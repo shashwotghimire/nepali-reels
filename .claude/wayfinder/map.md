@@ -1,6 +1,6 @@
 ---
 label: wayfinder:map
-status: open
+status: closed
 ---
 
 ## Destination
@@ -21,6 +21,8 @@ A video compositing pipeline step that combines a source video + burnt-in subtit
 - [Video compositing tool choice](tickets/01-video-compositing-tool-choice.md) — Raw FFmpeg via child_process.execFile, single-pass command, H.264+AAC output
 - [Video source abstraction](tickets/02-video-source-abstraction.md) — Simple function `getVideoSource(pipelineId): Promise<string>`, swap implementation when API key arrives
 - [Subtitle generation from videospec](tickets/03-subtitle-generation-from-videospec.md) — Map scenes directly to SRT, proportionally scale timestamps to actual TTS audio duration
+- [Compositing agent implementation](tickets/04-compositing-agent-implementation.md) — FFmpeg single-pass: loop/trim video to audio length, burn SRT subtitles, mux TTS audio → H.264+AAC MP4
+- [BullMQ background pipeline](tickets/05-bullmq-background-pipeline.md) — Single "pipeline" queue, API returns ID immediately, frontend polls; Redis via env vars
 
 ## Not yet specified
 
