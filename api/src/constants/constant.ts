@@ -12,6 +12,9 @@ export const SUBTITLE_TEXT_COLOR = "#FFE600";
 export const SUBTITLE_OUTLINE_COLOR = "#000000";
 export const FACT_CHECK_RUNS = 15 as const;
 
+export const ALIGNMENT_WORDS_PER_LINE = 6;
+export const ALIGNMENT_MAX_LINE_SECONDS = 4.0;
+
 export const CLAUDE_MODELS = {
   "Haiku 4.5": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
   "Sonnet 4.5": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",

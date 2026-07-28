@@ -14,6 +14,7 @@ import { factCheckerAgent } from "../pipeline/agents/fact-checker.agent";
 import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
 import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
+import { forcedAlignmentAgent } from "./agents/forced-alignment.agent";
 import { compositeVideo, burnThumbnailIntoVideo } from "../../helpers/video.helper";
 import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
 import { generateThumbnailAgent } from "./agents/thumbnail.agent";
@@ -83,6 +84,13 @@ export const createPipelineService = async (
   await saveAudioSpec(pipelineId, userId, soundSpec);
   console.log(`[pipeline:${pipelineId}] audio saved`);
 
+  console.log(`[pipeline:${pipelineId}] running forced alignment...`);
+  const alignedCaptions = await forcedAlignmentAgent(
+    soundSpec.audioFilePath,
+    videoSpec.voiceoverText,
+  );
+  console.log(`[pipeline:${pipelineId}] forced alignment done — ${alignedCaptions.length} caption chunks`);
+
   console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
   let thumbnailBuffer: Buffer | undefined;
   try {
@@ -94,7 +102,7 @@ export const createPipelineService = async (
   }
 
   console.log(`[pipeline:${pipelineId}] compositing video...`);
-  const rawVideoPath = await compositeVideo(pipelineId, finalScript.captions);
+  const rawVideoPath = await compositeVideo(pipelineId, alignedCaptions);
 
   let finalVideoPath = rawVideoPath;
   if (thumbnailBuffer) {
