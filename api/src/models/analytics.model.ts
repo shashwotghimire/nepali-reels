@@ -8,18 +8,9 @@ import {
 } from "sequelize";
 import sequelize from "../configs/db.config";
 import User from "./users.model";
+import type { TikTokVideoInsight } from "../types/tiktok.types";
 
-// Content Posting API (video.list scope) — own-video metrics only
-export interface TikTokVideoInsight {
-  video_id: string;
-  video_description: string;
-  create_time: number;
-  view_count: number;
-  like_count: number;
-  comment_count: number;
-  share_count: number;
-  duration: number;
-}
+export type { TikTokVideoInsight };
 
 export class Analytics extends Model<
   InferAttributes<Analytics>,

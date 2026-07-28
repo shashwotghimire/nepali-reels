@@ -1,7 +1,7 @@
 import fs from "fs";
 import { elevenLabsClient } from "../../../configs/elevenlabs.config";
 import { buildCaptionsFromAlignment } from "../../../helpers/srt.helper";
-import type { Caption } from "../../../helpers/srt.helper";
+import type { Caption } from "../../../types/subtitle.types";
 
 export const forcedAlignmentAgent = async (
   audioFilePath: string,

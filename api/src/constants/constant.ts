@@ -1,7 +1,7 @@
 export const STATE_COOKIE = "tiktok_oauth_state" as const;
 
-export const VIDEO_W = 1080;
-export const VIDEO_H = 1920;
+export const VIDEO_W = 720;
+export const VIDEO_H = 1280;
 export const SUBTITLE_FONT_SIZE = 72;
 export const SUBTITLE_FONT = `bold ${SUBTITLE_FONT_SIZE}px sans-serif`;
 export const SUBTITLE_MAX_LINE_W = VIDEO_W * 0.85;
@@ -23,3 +23,14 @@ export const CLAUDE_MODELS = {
 } as const;
 
 export type ClaudeModel = (typeof CLAUDE_MODELS)[keyof typeof CLAUDE_MODELS];
+
+export const AI_VIDEO_POLL_INTERVAL_MS = 5_000;
+export const AI_VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1_000;
+export const AI_VIDEO_MIN_SCENE_DURATION = 4;
+export const AI_VIDEO_MAX_SCENE_DURATION = 12;
+export const AI_VIDEO_MIN_TOTAL_DURATION = 55;
+export const AI_VIDEO_MAX_TOTAL_DURATION = 70;
+// Thumbnail prepends 1s; composite output must stay within this ceiling to keep final ≤ 70s
+export const AI_VIDEO_MAX_COMPOSITE_DURATION = 69;
+export const AI_VIDEO_SCENE_CONTIGUITY_TOLERANCE = 0.05;
+export const AI_VIDEO_DURATION_TOLERANCE = 0.25;

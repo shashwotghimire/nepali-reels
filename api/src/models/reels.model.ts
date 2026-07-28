@@ -8,17 +8,7 @@ import {
 } from "sequelize";
 import sequelize from "../configs/db.config";
 import User from "./users.model";
-
-type PipelineStatus =
-  | "queued"
-  | "script_generated"
-  | "script_finalised"
-  | "video_spec_generated"
-  | "sound_generated"
-  | "video_generated"
-  | "publish_pending"
-  | "published"
-  | "failed";
+import type { PipelineStatus } from "../types/pipeline.types";
 
 export class Reels extends Model<
   InferAttributes<Reels>,

@@ -1,7 +1,7 @@
 import { Canvas, CanvasRenderingContext2D } from "skia-canvas";
 import { writeFile, unlink } from "fs/promises";
 import path from "path";
-import { Caption } from "./srt.helper";
+import type { Caption, CaptionFrame } from "../types/subtitle.types";
 import {
   VIDEO_W,
   VIDEO_H,
@@ -31,7 +31,7 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string): string[] {
   return lines;
 }
 
-export type CaptionFrame = { pngPath: string; startSec: number; endSec: number };
+export type { CaptionFrame };
 
 export async function renderCaptionFrames(
   scaledCaptions: Caption[],

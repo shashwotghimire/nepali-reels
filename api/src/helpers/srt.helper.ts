@@ -1,16 +1,7 @@
 import { ALIGNMENT_WORDS_PER_LINE, ALIGNMENT_MAX_LINE_SECONDS } from "../constants/constant";
+import type { Caption, AlignmentWord } from "../types/subtitle.types";
 
-export interface Caption {
-  startSec: number;
-  endSec: number;
-  text: string;
-}
-
-export interface AlignmentWord {
-  text: string;
-  start: number;
-  end: number;
-}
+export type { Caption, AlignmentWord };
 
 export function buildCaptionsFromAlignment(words: AlignmentWord[]): Caption[] {
   const filtered = words.filter((w) => w.text.trim());

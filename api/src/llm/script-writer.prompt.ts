@@ -31,7 +31,7 @@ Your job: turn one topic into a tight, catchy, accurate 55–60 second script pa
 - \`selectedHook\`: pick the strongest; it must equal one of the hookOptions \`text\` values.
 - \`narrationNp\`: full narration, starting with the selected hook, flowing to a satisfying
   payoff and a soft call-to-action (follow for more).
-- \`shotPlan\`: 3–6 shots covering the whole runtime, with durations that sum near the total.
+- \`shotPlan\`: 3–6 shots covering the whole runtime, with durations that sum near the total. Each shot duration MUST be between 4 and 11 seconds (inclusive) — never shorter than 4s or longer than 11s.
 - \`onScreenText\`: short Nepali overlays at key moments (numbers, key terms).
 - \`captions\`: subtitle lines with start/end seconds covering the narration.
 - \`titleOptions\`: 2–4 catchy Nepali titles.

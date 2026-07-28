@@ -15,10 +15,16 @@ import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
 import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
 import { generateTextToSpeechAgent } from "./agents/tts.agent";
 import { forcedAlignmentAgent } from "./agents/forced-alignment.agent";
-import { compositeVideo, burnThumbnailIntoVideo } from "../../helpers/video.helper";
+import {
+  compositeVideo,
+  burnThumbnailIntoVideo,
+  validateFinalVideo,
+} from "../../helpers/video.helper";
 import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
 import { generateThumbnailAgent } from "./agents/thumbnail.agent";
 import { saveThumbnailUrl } from "../../repositories/reels.repository";
+import { validateVideoSpec } from "../../helpers/video-spec-validation.helper";
+import { generateAiVideoClips } from "./agents/ai-video-generator.agent";
 
 export const initPipelineService = async (
   userId: string,
@@ -89,7 +95,19 @@ export const createPipelineService = async (
     soundSpec.audioFilePath,
     videoSpec.voiceoverText,
   );
-  console.log(`[pipeline:${pipelineId}] forced alignment done — ${alignedCaptions.length} caption chunks`);
+  console.log(
+    `[pipeline:${pipelineId}] forced alignment done — ${alignedCaptions.length} caption chunks`,
+  );
+
+  console.log(`[pipeline:${pipelineId}] validating video spec...`);
+  validateVideoSpec(videoSpec);
+  console.log(`[pipeline:${pipelineId}] video spec valid`);
+
+  console.log(`[pipeline:${pipelineId}] generating AI video clips...`);
+  const bgVideoPath = await generateAiVideoClips(videoSpec.scenes, pipelineId);
+  console.log(
+    `[pipeline:${pipelineId}] AI background assembled at ${bgVideoPath}`,
+  );
 
   console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
   let thumbnailBuffer: Buffer | undefined;
@@ -102,13 +120,21 @@ export const createPipelineService = async (
   }
 
   console.log(`[pipeline:${pipelineId}] compositing video...`);
-  const rawVideoPath = await compositeVideo(pipelineId, alignedCaptions);
+  const rawVideoPath = await compositeVideo(
+    pipelineId,
+    alignedCaptions,
+    bgVideoPath,
+  );
 
   let finalVideoPath = rawVideoPath;
   if (thumbnailBuffer) {
     console.log(`[pipeline:${pipelineId}] burning thumbnail into video...`);
     try {
-      finalVideoPath = await burnThumbnailIntoVideo(rawVideoPath, thumbnailBuffer, pipelineId);
+      finalVideoPath = await burnThumbnailIntoVideo(
+        rawVideoPath,
+        thumbnailBuffer,
+        pipelineId,
+      );
       fs.unlink(rawVideoPath, () => {});
     } catch (err) {
       console.warn(
@@ -118,7 +144,9 @@ export const createPipelineService = async (
     }
   }
 
-  console.log(`[pipeline:${pipelineId}] video ready, uploading to s3`);
+  // console.log(`[pipeline:${pipelineId}] validating final video...`);
+  // await validateFinalVideo(finalVideoPath);
+  console.log(`[pipeline:${pipelineId}] uploading to s3`);
   const { key, url } = await uploadToS3(finalVideoPath, pipelineId);
   console.log("Uploaded to S3");
   await saveVideoOutput(pipelineId, userId, key);
@@ -128,14 +156,25 @@ export const createPipelineService = async (
         `[pipeline:${pipelineId}] failed to delete local video: ${err.message}`,
       );
   });
+  fs.rm(`src/video/${pipelineId}`, { recursive: true, force: true }, (err) => {
+    if (err)
+      console.warn(
+        `[pipeline:${pipelineId}] failed to delete clip dir: ${err.message}`,
+      );
+  });
 
   let thumbnailUrl: string | undefined;
   if (thumbnailBuffer) {
     try {
-      const { url: tUrl } = await uploadThumbnailToS3(thumbnailBuffer, pipelineId);
+      const { url: tUrl } = await uploadThumbnailToS3(
+        thumbnailBuffer,
+        pipelineId,
+      );
       thumbnailUrl = tUrl;
       await saveThumbnailUrl(pipelineId, userId, thumbnailUrl);
-      console.log(`[pipeline:${pipelineId}] thumbnail uploaded: ${thumbnailUrl}`);
+      console.log(
+        `[pipeline:${pipelineId}] thumbnail uploaded: ${thumbnailUrl}`,
+      );
     } catch (err) {
       console.warn(
         `[pipeline:${pipelineId}] thumbnail S3 upload skipped: ${err instanceof Error ? err.message : err}`,

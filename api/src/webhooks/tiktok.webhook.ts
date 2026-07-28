@@ -1,21 +1,7 @@
 import { Request, Response } from "express";
 import asyncHandler from "../utils/asyncHandler.util";
 import { findPipelineByPublishId } from "../repositories/reels.repository";
-
-type TiktokWebhookEvent =
-  | "post.publish.failed"
-  | "post.publish.complete"
-  | "post.publish.inbox_delivered"
-  | "post.publish.publicly_available"
-  | "post.publish.no_longer_publicaly_available";
-
-interface TiktokWebhookPayload {
-  event: TiktokWebhookEvent;
-  publish_id: string;
-  post_id?: string;
-  publish_type?: string;
-  reason?: string;
-}
+import type { TiktokWebhookEvent, TiktokWebhookPayload } from "../types/tiktok.types";
 
 const RETRYABLE_FAIL_REASONS = new Set(["internal", "video_pull_failed", "photo_pull_failed"]);
 
