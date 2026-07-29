@@ -2,8 +2,7 @@ import { buttonVariants } from "@/components/ui/button";
 import Login from "@/components/auth/Login";
 import Footer from "@/components/common/Footer";
 import logoSrc from "@/assets/logo.png";
-
-const LEGAL_BASE = "https://shashwotghimire.github.io/nepali-reels-legal";
+import { Link } from "react-router-dom";
 
 const steps = [
   {
@@ -97,13 +96,13 @@ export default function Landing() {
               <h2 className="text-xl font-semibold tracking-tight">Sign in to Nepali Reels</h2>
               <p className="text-sm text-muted-foreground">
                 By continuing you agree to our{" "}
-                <a href={`${LEGAL_BASE}/terms-of-service.html`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground">
+                <Link to="/terms" className="underline underline-offset-4 hover:text-foreground">
                   Terms
-                </a>{" "}
+                </Link>{" "}
                 and{" "}
-                <a href={`${LEGAL_BASE}/privacy-policy.html`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground">
+                <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">
                   Privacy Policy
-                </a>
+                </Link>
                 .
               </p>
             </div>

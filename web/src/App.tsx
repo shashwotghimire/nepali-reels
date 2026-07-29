@@ -6,6 +6,8 @@ import Connections from "./pages/Connections";
 import Settings from "./pages/Settings";
 import PipelineDetail from "./pages/PipelineDetail";
 import Landing from "./pages/Landing";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
@@ -17,6 +19,8 @@ function App() {
       <Routes>
         <Route element={<PublicRoute />}>
           <Route path="/" element={<Landing />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
