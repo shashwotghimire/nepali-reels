@@ -250,7 +250,7 @@ export default function PipelineDetail() {
           {data.videoSpec && <VideoSpecSection spec={data.videoSpec} />}
         </div>
 
-        <div className="space-y-6 sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto">
+        <div className="space-y-6 sticky top-6 max-h-[calc(100vh-9rem)] overflow-y-auto">
           {data.pipelineStatus === "sound_generated" && (
             <section className="space-y-2">
               <h2 className="text-base font-semibold">Audio</h2>
