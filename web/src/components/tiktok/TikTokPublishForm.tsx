@@ -23,6 +23,7 @@ const PRIVACY_LABELS: Record<string, string> = {
 
 interface Props {
   creatorInfo: TikTokCreatorInfo;
+  videoDurationSec: number | null;
   initialCaption: string;
   isPublishing: boolean;
   onPublish: (req: Omit<PublishToTiktokRequest, "pipelineId" | "videoUrl">) => void;
@@ -30,6 +31,7 @@ interface Props {
 
 export default function TikTokPublishForm({
   creatorInfo,
+  videoDurationSec,
   initialCaption,
   isPublishing,
   onPublish,
@@ -42,6 +44,7 @@ export default function TikTokPublishForm({
   const [commercialContent, setCommercialContent] = useState(false);
   const [brandOrganic, setBrandOrganic] = useState(false);
   const [brandedContent, setBrandedContent] = useState(false);
+  const [isAigc, setIsAigc] = useState(true);
   const [consentChecked, setConsentChecked] = useState(false);
 
   const consentText =
@@ -49,11 +52,16 @@ export default function TikTokPublishForm({
       ? "By posting, you agree to TikTok's Branded Content Policy and Music Usage Confirmation."
       : "By posting, you agree to TikTok's Music Usage Confirmation.";
 
+  const exceedsDurationLimit =
+    videoDurationSec != null &&
+    videoDurationSec > creatorInfo.maxVideoPostDurationSec;
+
   const canPublish =
     caption.trim().length > 0 &&
     privacyLevel !== "" &&
     consentChecked &&
-    (!commercialContent || brandOrganic || brandedContent);
+    (!commercialContent || brandOrganic || brandedContent) &&
+    !exceedsDurationLimit;
 
   function handleSubmit() {
     if (!canPublish) return;
@@ -63,8 +71,9 @@ export default function TikTokPublishForm({
       disableComment: !allowComment,
       disableDuet: !allowDuet,
       disableStitch: !allowStitch,
-      brandContentToggle: commercialContent,
+      brandContentToggle: brandedContent,
       brandOrganicToggle: brandOrganic,
+      isAigc,
     });
   }
 
@@ -178,6 +187,18 @@ export default function TikTokPublishForm({
         </div>
       </div>
 
+      {/* AI-generated content */}
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="tt-aigc"
+          checked={isAigc}
+          onCheckedChange={(v) => setIsAigc(!!v)}
+        />
+        <Label htmlFor="tt-aigc" className="text-sm">
+          AI-generated content
+        </Label>
+      </div>
+
       {/* Commercial content */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
@@ -244,6 +265,13 @@ export default function TikTokPublishForm({
           {consentText}
         </Label>
       </div>
+
+      {/* Duration warning */}
+      {exceedsDurationLimit && (
+        <p className="text-xs text-destructive">
+          This video is {videoDurationSec!.toFixed(1)}s but your TikTok account allows a maximum of {creatorInfo.maxVideoPostDurationSec}s. You cannot post this video.
+        </p>
+      )}
 
       {/* Processing notice */}
       <p className="text-xs text-muted-foreground">

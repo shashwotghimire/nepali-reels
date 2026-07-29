@@ -3,7 +3,7 @@ import path from "path";
 import { Worker } from "bullmq";
 import { connection } from "../configs/redis.config";
 import { runAnalyticsFanout } from "../queue/analytics.scheduler";
-import { getUserTiktokAccessToken } from "../repositories/tiktok.repository";
+import { getValidAccessToken } from "../services/tiktok.service";
 import Reels from "../models/reels.model";
 import Analytics from "../models/analytics.model";
 import { analyticsAgent } from "../services/pipeline/agents/analytics.agent";
@@ -54,12 +54,13 @@ export const analyticsWorker = new Worker(
     const { userId } = job.data as { userId: string };
     console.log(`[analytics:worker] processing user ${userId}`);
 
-    const connection = await getUserTiktokAccessToken(userId);
-    if (!connection) {
-      console.warn(`[analytics:worker] no TikTok token for user ${userId} — skipping`);
+    try {
+      await getValidAccessToken(userId);
+    } catch {
+      console.warn(`[analytics:worker] no valid TikTok token for user ${userId} — skipping`);
       return;
     }
-    console.log(`[analytics:worker] TikTok token found for user ${userId}`);
+    console.log(`[analytics:worker] TikTok token valid for user ${userId}`);
 
     const reels = await Reels.findAll({
       where: { userId, pipelineStatus: "published" },

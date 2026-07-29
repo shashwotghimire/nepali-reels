@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  connectTiktokService,
   disconnectTiktokService,
   getUserTiktokConnectionDetails,
   getCreatorInfoService,
@@ -10,6 +11,14 @@ import type {
   UserTiktokConnectionDetailsResponse,
   PublishToTiktokRequest,
 } from "@/types/api/tiktok-api.types";
+
+const isRefreshExpired = (error: unknown) =>
+  (error as any)?.response?.data?.errorCode === "TIKTOK_REFRESH_EXPIRED";
+
+const toastReconnect = () =>
+  toast.error("TikTok session expired — please reconnect your account", {
+    action: { label: "Reconnect", onClick: connectTiktokService },
+  });
 
 export const useGetTiktokConnectionDetails = () =>
   useQuery<UserTiktokConnectionDetailsResponse>({
@@ -24,6 +33,13 @@ export const useGetCreatorInfo = (enabled: boolean) =>
     enabled,
     staleTime: 0,
     gcTime: 0,
+    throwOnError: (error) => {
+      if (isRefreshExpired(error)) {
+        toastReconnect();
+        return false;
+      }
+      return true;
+    },
   });
 
 export const useDisconnectTiktok = () => {
@@ -42,8 +58,12 @@ export const usePublishToTiktok = (pipelineId: string) => {
       toast.success("Published to TikTok");
       queryClient.invalidateQueries({ queryKey: ["pipeline", pipelineId] });
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message ?? "Failed to publish to TikTok";
+    onError: (error: unknown) => {
+      if (isRefreshExpired(error)) {
+        toastReconnect();
+        return;
+      }
+      const message = (error as any)?.response?.data?.message ?? "Failed to publish to TikTok";
       toast.error(message);
     },
   });

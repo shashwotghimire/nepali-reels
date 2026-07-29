@@ -28,9 +28,21 @@ export const deleteTiktokConnection = async (userId: string) => {
   return TiktokConnection.destroy({ where: { userId } });
 };
 
-export const getUserTiktokAccessToken = async (userId: string) => {
+export const getUserTiktokTokens = async (userId: string) => {
   return TiktokConnection.findOne({
     where: { userId },
-    attributes: ["tiktokAccessToken"],
+    attributes: ["tiktokAccessToken", "tiktokRefreshToken", "tiktokExpiresAt", "tiktokRefreshExpiresAt"],
   });
+};
+
+export const updateTiktokTokens = async (
+  userId: string,
+  data: {
+    tiktokAccessToken: string;
+    tiktokRefreshToken: string;
+    tiktokExpiresAt: number;
+    tiktokRefreshExpiresAt: number;
+  },
+) => {
+  return TiktokConnection.update(data, { where: { userId } });
 };

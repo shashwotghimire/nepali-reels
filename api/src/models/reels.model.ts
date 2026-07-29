@@ -23,6 +23,7 @@ export class Reels extends Model<
   declare videoSpec: CreationOptional<object | null>;
   declare soundSpec: CreationOptional<object | null>;
   declare pipelineStatus: PipelineStatus;
+  declare videoDurationSec: CreationOptional<number | null>;
   declare s3key: CreationOptional<string | null>;
   declare tiktokPublishId: CreationOptional<string | null>;
   declare thumbnailUrl: CreationOptional<string | null>;
@@ -82,6 +83,10 @@ Reels.init(
       ),
       allowNull: false,
       defaultValue: "queued",
+    },
+    videoDurationSec: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
     },
     s3key: {
       type: DataTypes.STRING,

@@ -1,6 +1,6 @@
 import { Worker, UnrecoverableError } from "bullmq";
 import { connection } from "../configs/redis.config";
-import { getUserTiktokAccessToken } from "../repositories/tiktok.repository";
+import { getValidAccessToken } from "../services/tiktok.service";
 import { findPipelineByPublishId } from "../repositories/reels.repository";
 import { workerLog } from "../helpers/worker-log.helper";
 
@@ -21,17 +21,23 @@ export const tiktokWorker = new Worker(
     const { publishId, pipelineId, userId } = job.data;
     log(job.id, `starting — publishId=${publishId} pipelineId=${pipelineId} userId=${userId} attempt=${job.attemptsMade + 1}`);
 
-    const connection_ = await getUserTiktokAccessToken(userId);
-    if (!connection_) {
-      log(job.id, "no TikTok connection found for user — unrecoverable");
-      throw new UnrecoverableError("TikTok connection not found");
+    let accessToken: string;
+    try {
+      accessToken = await getValidAccessToken(userId);
+    } catch (err: unknown) {
+      const code = (err as { errorCode?: string })?.errorCode;
+      if (code === "TIKTOK_NOT_CONNECTED" || code === "TIKTOK_REFRESH_EXPIRED") {
+        log(job.id, `token unavailable (${code}) — unrecoverable`);
+        throw new UnrecoverableError(`TikTok token unavailable: ${code}`);
+      }
+      throw err;
     }
     log(job.id, "fetching publish status from TikTok");
 
     const res = await fetch("https://open.tiktokapis.com/v2/post/publish/status/fetch/", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${connection_.tiktokAccessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json; charset=UTF-8",
       },
       body: JSON.stringify({ publish_id: publishId }),

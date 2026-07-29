@@ -11,6 +11,7 @@ export interface TikTokUserProfile {
 
 export interface UserTiktokConnectionDetailsResponse {
   connected: boolean;
+  tokenExpired: boolean;
   tiktokUserId: string | null;
   profile: TikTokUserProfile | null;
 }
@@ -28,7 +29,6 @@ export interface TikTokCreatorInfo {
 
 export interface PublishToTiktokRequest {
   pipelineId: string;
-  videoUrl: string;
   title: string;
   privacyLevel: string;
   disableComment: boolean;
@@ -36,6 +36,7 @@ export interface PublishToTiktokRequest {
   disableStitch: boolean;
   brandContentToggle: boolean;
   brandOrganicToggle: boolean;
+  isAigc: boolean;
 }
 
 export interface PublishToTiktokResponse {

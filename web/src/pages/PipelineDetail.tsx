@@ -287,6 +287,7 @@ export default function PipelineDetail() {
                 ) : creatorInfo ? (
                   <TikTokPublishForm
                     creatorInfo={creatorInfo}
+                    videoDurationSec={data.videoDurationSec}
                     initialCaption={
                       data.finalScript?.titleOptions[0] ??
                       data.draftScript?.titleOptions[0] ??
@@ -296,7 +297,6 @@ export default function PipelineDetail() {
                     onPublish={(fields) =>
                       publishToTiktok({
                         pipelineId: data.id,
-                        videoUrl: `https://${import.meta.env.VITE_CDN_DOMAIN}/${data.s3key}`,
                         ...fields,
                       })
                     }

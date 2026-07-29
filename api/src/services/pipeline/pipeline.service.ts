@@ -19,6 +19,7 @@ import {
   compositeVideo,
   burnThumbnailIntoVideo,
   validateFinalVideo,
+  getVideoDuration,
 } from "../../helpers/video.helper";
 import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
 import { generateThumbnailAgent } from "./agents/thumbnail.agent";
@@ -146,10 +147,11 @@ export const createPipelineService = async (
 
   // console.log(`[pipeline:${pipelineId}] validating final video...`);
   // await validateFinalVideo(finalVideoPath);
+  const videoDurationSec = await getVideoDuration(finalVideoPath);
   console.log(`[pipeline:${pipelineId}] uploading to s3`);
   const { key, url } = await uploadToS3(finalVideoPath, pipelineId);
   console.log("Uploaded to S3");
-  await saveVideoOutput(pipelineId, userId, key);
+  await saveVideoOutput(pipelineId, userId, key, videoDurationSec);
   fs.unlink(finalVideoPath, (err) => {
     if (err)
       console.warn(

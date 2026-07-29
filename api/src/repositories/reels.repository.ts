@@ -96,11 +96,13 @@ export const saveVideoOutput = async (
   pipelineId: string,
   userId: string,
   s3key: string,
+  videoDurationSec: number,
 ) => {
   const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
   if (!pipeline) throw new Error("Reel not found");
   pipeline.pipelineStatus = "video_generated";
   pipeline.s3key = s3key;
+  pipeline.videoDurationSec = videoDurationSec;
   await pipeline.save();
 };
 

@@ -1,6 +1,5 @@
 import { signOut, useSession } from "@/lib/auth-client";
 import { LogOut, Settings } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +11,6 @@ import {
 function UserProfile() {
   const { data } = useSession();
   const user = data?.user;
-
-  const navigate = useNavigate();
 
   if (!user) return null;
 
@@ -38,7 +35,7 @@ function UserProfile() {
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
-          onClick={() => signOut({ fetchOptions: { onSuccess: () => navigate("/") } })}
+          onClick={() => signOut({ callbackURL: "/" })}
         >
           <LogOut />
           Log out

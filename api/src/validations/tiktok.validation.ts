@@ -4,7 +4,6 @@ export const publishVideoSchema = z.object({
   body: z
     .object({
       pipelineId: z.string().uuid("Invalid pipeline ID"),
-      videoUrl: z.string().url("Invalid video URL"),
       title: z.string().min(1, "Title is required").max(2200, "Title must be 2200 characters or less"),
       privacyLevel: z.string().min(1, "Privacy level is required"),
       disableComment: z.boolean(),
@@ -12,6 +11,7 @@ export const publishVideoSchema = z.object({
       disableStitch: z.boolean(),
       brandContentToggle: z.boolean(),
       brandOrganicToggle: z.boolean(),
+      isAigc: z.boolean(),
     })
     .refine(
       (data) => !(data.brandContentToggle && data.privacyLevel === "SELF_ONLY"),

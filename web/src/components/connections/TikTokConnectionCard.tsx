@@ -27,7 +27,11 @@ export default function TikTokConnectionCard() {
   const { data, isPending } = useGetTiktokConnectionDetails();
   const { mutate: disconnect, isPending: isDisconnecting } = useDisconnectTiktok();
 
-  const status: ConnectionStatus = data?.connected ? "connected" : "disconnected";
+  const status: ConnectionStatus = data?.connected
+    ? data.tokenExpired
+      ? "expired"
+      : "connected"
+    : "disconnected";
   const { label, variant } = statusConfig[status];
   const profile = data?.profile;
 
@@ -67,12 +71,23 @@ export default function TikTokConnectionCard() {
           </p>
         )}
       </CardContent>
-      <CardFooter>
-        {status === "connected" ? (
+      <CardFooter className="flex gap-2">
+        {status === "connected" && (
           <Button variant="destructive" size="sm" disabled={isDisconnecting} onClick={() => disconnect()}>
             Disconnect
           </Button>
-        ) : (
+        )}
+        {status === "expired" && (
+          <>
+            <Button size="sm" onClick={connectTiktokService}>
+              Reconnect
+            </Button>
+            <Button variant="outline" size="sm" disabled={isDisconnecting} onClick={() => disconnect()}>
+              Disconnect
+            </Button>
+          </>
+        )}
+        {status === "disconnected" && (
           <Button size="sm" disabled={isPending} onClick={connectTiktokService}>
             Connect TikTok
           </Button>

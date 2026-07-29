@@ -55,9 +55,13 @@ export const tiktokCallback = asyncHandler(
 export const getTiktokStatus = asyncHandler(
   async (req: Request, res: Response) => {
     const connection = await getUserTiktokConnectionDetailsService(res.locals.user.id);
+    const tokenExpired = connection
+      ? Date.now() >= Number(connection.tiktokRefreshExpiresAt)
+      : false;
     res.status(200).json(
       new ApiResponse(true, "TikTok connection status fetched.", {
         connected: !!connection,
+        tokenExpired,
         tiktokUserId: connection?.tiktokUserId ?? null,
         profile: connection
           ? {
@@ -89,7 +93,6 @@ export const publishVideo = asyncHandler(
   async (req: Request, res: Response) => {
     const {
       pipelineId,
-      videoUrl,
       title,
       privacyLevel,
       disableComment,
@@ -97,11 +100,11 @@ export const publishVideo = asyncHandler(
       disableStitch,
       brandContentToggle,
       brandOrganicToggle,
+      isAigc,
     } = req.body;
     const publishId = await uploadToTiktokService(
       res.locals.user.id,
       pipelineId,
-      videoUrl,
       title,
       privacyLevel,
       disableComment,
@@ -109,6 +112,7 @@ export const publishVideo = asyncHandler(
       disableStitch,
       brandContentToggle,
       brandOrganicToggle,
+      isAigc,
     );
     res.status(200).json(new ApiResponse(true, "Video published to TikTok.", { publishId }));
   },

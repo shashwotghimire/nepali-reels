@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AppSidebar from "@/components/common/AppSidebar";
 import UserProfile from "@/components/common/UserProfile";
+import Footer from "@/components/common/Footer";
 
 function AppLayout() {
   return (
@@ -18,6 +19,7 @@ function AppLayout() {
             <main className="flex-1 overflow-auto">
               <Outlet />
             </main>
+            <Footer />
           </div>
         </div>
       </SidebarProvider>
