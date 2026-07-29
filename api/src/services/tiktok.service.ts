@@ -6,7 +6,10 @@ import {
   getUserTiktokTokens,
   updateTiktokTokens,
 } from "../repositories/tiktok.repository";
-import { findPipelineById, publishToTiktok } from "../repositories/reels.repository";
+import {
+  findPipelineById,
+  publishToTiktok,
+} from "../repositories/reels.repository";
 import { ApiError } from "../utils/ApiError.util";
 import { enqueueTiktokStatusPoll } from "../queue/tiktok.queue";
 
@@ -24,9 +27,10 @@ export const buildAuthUrl = () => {
   return { url: url.toString(), state };
 };
 
+// follower_count,following_count,video_count,likes_count add this to scope when we have need analytics
 const fetchTiktokProfile = async (accessToken: string) => {
   const res = await fetch(
-    "https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,username,follower_count,following_count,video_count,likes_count",
+    "https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,username",
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   const data = await res.json();
@@ -41,7 +45,10 @@ const fetchTiktokProfile = async (accessToken: string) => {
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
-const refreshAccessToken = async (userId: string, refreshToken: string): Promise<string> => {
+const refreshAccessToken = async (
+  userId: string,
+  refreshToken: string,
+): Promise<string> => {
   const res = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
     method: "POST",
     headers: {
@@ -57,7 +64,11 @@ const refreshAccessToken = async (userId: string, refreshToken: string): Promise
   });
   const data = await res.json();
   if (data.error) {
-    throw new ApiError(401, `TikTok token refresh failed: ${data.error}`, "TIKTOK_TOKEN_REFRESH_FAILED");
+    throw new ApiError(
+      401,
+      `TikTok token refresh failed: ${data.error}`,
+      "TIKTOK_TOKEN_REFRESH_FAILED",
+    );
   }
   const now = Date.now();
   await updateTiktokTokens(userId, {
@@ -71,7 +82,12 @@ const refreshAccessToken = async (userId: string, refreshToken: string): Promise
 
 export const getValidAccessToken = async (userId: string): Promise<string> => {
   const conn = await getUserTiktokTokens(userId);
-  if (!conn) throw new ApiError(404, "TikTok account not connected", "TIKTOK_NOT_CONNECTED");
+  if (!conn)
+    throw new ApiError(
+      404,
+      "TikTok account not connected",
+      "TIKTOK_NOT_CONNECTED",
+    );
 
   const now = Date.now();
   if (now + REFRESH_BUFFER_MS < Number(conn.tiktokExpiresAt)) {
@@ -80,7 +96,11 @@ export const getValidAccessToken = async (userId: string): Promise<string> => {
 
   // Access token is expired (or about to); try refresh
   if (now >= Number(conn.tiktokRefreshExpiresAt)) {
-    throw new ApiError(401, "TikTok session expired — please reconnect your TikTok account", "TIKTOK_REFRESH_EXPIRED");
+    throw new ApiError(
+      401,
+      "TikTok session expired — please reconnect your TikTok account",
+      "TIKTOK_REFRESH_EXPIRED",
+    );
   }
 
   return refreshAccessToken(userId, conn.tiktokRefreshToken);
@@ -123,7 +143,7 @@ export const exchangeCodeForToken = async (code: string, userId: string) => {
     avatarUrl: profile.avatar_url,
     username: profile.username,
   });
-
+  console.log("TikTok token exchange response:", JSON.stringify(data, null, 2));
   return data;
 };
 
@@ -203,7 +223,11 @@ export const uploadToTiktokService = async (
   }
 
   if (pipeline.pipelineStatus !== "video_generated") {
-    throw new ApiError(400, "Pipeline video is not ready for publishing", "PIPELINE_NOT_READY");
+    throw new ApiError(
+      400,
+      "Pipeline video is not ready for publishing",
+      "PIPELINE_NOT_READY",
+    );
   }
 
   if (!pipeline.s3key) {
