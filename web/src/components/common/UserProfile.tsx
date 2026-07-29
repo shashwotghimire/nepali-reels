@@ -35,7 +35,7 @@ function UserProfile() {
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
-          onClick={() => signOut({ callbackURL: "/" })}
+          onClick={() => signOut({ fetchOptions: { onSuccess: () => { window.location.href = "/"; } } })}
         >
           <LogOut />
           Log out
