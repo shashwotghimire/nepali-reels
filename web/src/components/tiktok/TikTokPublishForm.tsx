@@ -108,7 +108,7 @@ export default function TikTokPublishForm({
         <Label className="text-xs text-muted-foreground uppercase tracking-wide">
           Privacy
         </Label>
-        <Select value={privacyLevel} onValueChange={setPrivacyLevel}>
+        <Select value={privacyLevel} onValueChange={(value) => setPrivacyLevel(value ?? "")}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Choose visibility" />
           </SelectTrigger>
