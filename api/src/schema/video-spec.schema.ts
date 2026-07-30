@@ -1,12 +1,19 @@
 import { z } from "zod";
 
-export const SceneSchema = z.object({
-  startSec: z.number().nonnegative(),
-  endSec: z.number().positive(),
-  bgPrompt: z.string(),
-  captionText: z.string(),
-  onScreenText: z.string().optional(),
-});
+export const SceneSchema = z
+  .object({
+    startSec: z.number().nonnegative(),
+    endSec: z.number().positive(),
+    bgPrompt: z.string(),
+    captionText: z.string(),
+    onScreenText: z.string().optional(),
+  })
+  .refine((s) => s.endSec - s.startSec >= 4, {
+    message: "Scene duration must be at least 4 seconds",
+  })
+  .refine((s) => s.endSec - s.startSec <= 11, {
+    message: "Scene duration must not exceed 11 seconds",
+  });
 
 export const VideoSpecSchema = z.object({
   voiceoverText: z.string(),
