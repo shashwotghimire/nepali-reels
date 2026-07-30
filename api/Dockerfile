@@ -17,6 +17,9 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY samples ./samples
+
+RUN mkdir -p src/audio src/video
 
 EXPOSE 8000
 
