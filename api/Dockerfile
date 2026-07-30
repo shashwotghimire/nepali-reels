@@ -21,9 +21,10 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY samples ./samples
 
-RUN wget -q -O /usr/share/fonts/NotoSansDevanagari.ttf \
+RUN mkdir -p /usr/share/fonts/noto src/audio src/video \
+    && wget -q -O /usr/share/fonts/noto/NotoSansDevanagari.ttf \
     "https://github.com/google/fonts/raw/main/ofl/notosansdevanagari/NotoSansDevanagari%5Bwdth%2Cwght%5D.ttf" \
-    && fc-cache -f && mkdir -p src/audio src/video
+    && fc-cache -f
 
 EXPOSE 8000
 
