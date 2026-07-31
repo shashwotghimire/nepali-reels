@@ -5,8 +5,8 @@ import { connection } from "../configs/redis.config";
 export const pipelineWorker = new Worker(
   "pipeline",
   async (job) => {
-    const { userId, pipelineId, topic, model } = job.data;
-    await createPipelineService(userId, pipelineId, topic, model);
+    const { userId, pipelineId, topic, model, videoModel } = job.data;
+    await createPipelineService(userId, pipelineId, topic, model, videoModel);
   },
   {
     connection,

@@ -71,6 +71,7 @@ export interface Reel {
   userId: string;
   topic: string;
   claudeModel: ClaudeModel;
+  videoModel: VideoModel;
   draftScript: ScriptOutput | null;
   finalScript: ScriptOutput | null;
   videoSpec: VideoSpec | null;
@@ -88,14 +89,21 @@ export type ClaudeModel =
   | "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
   | "global.anthropic.claude-opus-4-5-20251101-v1:0";
 
+export type VideoModel =
+  | "bytedance/seedance-1-5-pro"
+  | "alibaba/wan-2.6"
+  | "x-ai/grok-imagine-video";
+
 export interface GenerateScriptRequest {
   topic: string;
   model?: ClaudeModel;
+  videoModel?: VideoModel;
 }
 
 export interface GenerateScriptResponse {
   pipelineId: string;
   model: ClaudeModel;
+  videoModel: VideoModel;
 }
 
 export interface GetReelsParams {

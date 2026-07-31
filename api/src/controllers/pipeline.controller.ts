@@ -143,14 +143,15 @@ export const deletePipeline = asyncHandler(
 
 export const generateScript = asyncHandler(
   async (req: Request, res: Response) => {
-    const { topic, model } = req.body;
+    const { topic, model, videoModel } = req.body;
     const userId = res.locals.user.id;
-    const pipeline = await initPipelineService(userId, topic, model);
+    const pipeline = await initPipelineService(userId, topic, model, videoModel);
     await pipelineQueue.add("generate", {
       userId,
       pipelineId: pipeline.id,
       topic,
       model,
+      videoModel,
     });
     res
       .status(202)
@@ -158,6 +159,7 @@ export const generateScript = asyncHandler(
         new ApiResponse(true, "Pipeline queued successfully", {
           pipelineId: pipeline.id,
           model,
+          videoModel,
         }),
       );
   },

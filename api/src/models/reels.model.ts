@@ -18,6 +18,7 @@ export class Reels extends Model<
   declare userId: ForeignKey<string>;
   declare topic: string;
   declare claudeModel: string;
+  declare videoModel: string;
   declare draftScript: CreationOptional<object | null>;
   declare finalScript: CreationOptional<object | null>;
   declare videoSpec: CreationOptional<object | null>;
@@ -50,6 +51,10 @@ Reels.init(
       allowNull: false,
     },
     claudeModel: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    videoModel: {
       type: DataTypes.STRING,
       allowNull: false,
     },

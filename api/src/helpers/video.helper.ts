@@ -159,7 +159,7 @@ export async function burnThumbnailIntoVideo(
       "-c:v",
       "libx264",
       "-preset",
-      "fast",
+      "ultrafast",
       "-crf",
       "23",
       "-pix_fmt",

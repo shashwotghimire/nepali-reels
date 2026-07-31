@@ -24,6 +24,14 @@ export const CLAUDE_MODELS = {
 
 export type ClaudeModel = (typeof CLAUDE_MODELS)[keyof typeof CLAUDE_MODELS];
 
+export const VIDEO_MODELS = {
+  "Seedance 1.5 Pro": "bytedance/seedance-1-5-pro",
+  "Wan 2.6": "alibaba/wan-2.6",
+  "Grok Imagine Video": "x-ai/grok-imagine-video",
+} as const;
+
+export type VideoModel = (typeof VIDEO_MODELS)[keyof typeof VIDEO_MODELS];
+
 export const AI_VIDEO_POLL_INTERVAL_MS = 5_000;
 export const AI_VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1_000;
 export const AI_VIDEO_MIN_SCENE_DURATION = 4;

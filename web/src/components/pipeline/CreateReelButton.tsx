@@ -20,23 +20,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGenerateScript } from "@/hooks/api/usePipeline";
-import type { ClaudeModel } from "@/types/api/pipeline-api.types";
+import type { ClaudeModel, VideoModel } from "@/types/api/pipeline-api.types";
 
-const MODELS: ClaudeModel[] = [
+const CLAUDE_MODELS: ClaudeModel[] = [
   "global.anthropic.claude-haiku-4-5-20251001-v1:0",
   "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
   "global.anthropic.claude-opus-4-5-20251101-v1:0",
 ];
 
-const modelLabel = (model: ClaudeModel) =>
+const claudeModelLabel = (model: ClaudeModel) =>
   model.split("claude-")[1]?.split("-v")[0] ?? model;
 
+const VIDEO_MODELS: { value: VideoModel; label: string }[] = [
+  { value: "bytedance/seedance-1-5-pro", label: "Seedance 1.5 Pro" },
+  { value: "alibaba/wan-2.6", label: "Wan 2.6" },
+  { value: "x-ai/grok-imagine-video", label: "Grok Imagine Video" },
+];
+
 const DEFAULT_MODEL: ClaudeModel = "global.anthropic.claude-sonnet-4-5-20250929-v1:0";
+const DEFAULT_VIDEO_MODEL: VideoModel = "bytedance/seedance-1-5-pro";
 
 export default function CreateReelButton() {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState("");
   const [model, setModel] = useState<ClaudeModel>(DEFAULT_MODEL);
+  const [videoModel, setVideoModel] = useState<VideoModel>(DEFAULT_VIDEO_MODEL);
 
   const { mutate, isPending } = useGenerateScript();
 
@@ -44,13 +52,14 @@ export default function CreateReelButton() {
     e.preventDefault();
     if (!topic.trim()) return;
     mutate(
-      { topic: topic.trim(), model },
+      { topic: topic.trim(), model, videoModel },
       {
         onSuccess: () => {
           toast.success("Pipeline queued successfully");
           setOpen(false);
           setTopic("");
           setModel(DEFAULT_MODEL);
+          setVideoModel(DEFAULT_VIDEO_MODEL);
         },
         onError: () => {
           toast.error("Failed to create reel. Please try again.");
@@ -88,7 +97,7 @@ export default function CreateReelButton() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Model</label>
+              <label className="text-sm font-medium">AI Model</label>
               <Select
                 value={model}
                 onValueChange={(val) => setModel(val as ClaudeModel)}
@@ -98,9 +107,29 @@ export default function CreateReelButton() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MODELS.map((m) => (
+                  {CLAUDE_MODELS.map((m) => (
                     <SelectItem key={m} value={m}>
-                      {modelLabel(m)}
+                      {claudeModelLabel(m)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Video Model</label>
+              <Select
+                value={videoModel}
+                onValueChange={(val) => setVideoModel(val as VideoModel)}
+                disabled={isPending}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VIDEO_MODELS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

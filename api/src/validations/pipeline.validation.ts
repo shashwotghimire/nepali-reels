@@ -1,7 +1,8 @@
 import z from "zod";
-import { CLAUDE_MODELS } from "../constants/constant";
+import { CLAUDE_MODELS, VIDEO_MODELS } from "../constants/constant";
 
 const claudeModelValues = Object.values(CLAUDE_MODELS) as [string, ...string[]];
+const videoModelValues = Object.values(VIDEO_MODELS) as [string, ...string[]];
 
 export const getPipelineByIdSchema = z.object({
   params: z.object({
@@ -21,5 +22,6 @@ export const generateScriptSchema = z.object({
   body: z.object({
     topic: z.string().min(3, "Topic must be at least 3 characters"),
     model: z.enum(claudeModelValues).default(CLAUDE_MODELS["Sonnet 4.5"]),
+    videoModel: z.enum(videoModelValues).default(VIDEO_MODELS["Seedance 1.5 Pro"]),
   }),
 });

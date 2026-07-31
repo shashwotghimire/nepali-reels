@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetReelsOfUser, useDeletePipeline } from "@/hooks/api/usePipeline";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PIPELINE_STATUS_VARIANT } from "@/types/ui/pipeline.types";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function UserReelsTable() {
   const navigate = useNavigate();
-  const { data, isPending, error } = useGetReelsOfUser();
+  const [page, setPage] = useState(1);
+  const { data, isPending, isFetching, error } = useGetReelsOfUser({ page });
   const { mutate: deletePipeline, isPending: isDeleting } = useDeletePipeline();
 
   if (isPending) {
@@ -61,6 +64,7 @@ export default function UserReelsTable() {
             <TableHead>Topic</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Model</TableHead>
+            <TableHead>Video Model</TableHead>
             <TableHead>Created</TableHead>
             <TableHead />
           </TableRow>
@@ -76,6 +80,9 @@ export default function UserReelsTable() {
               </TableCell>
               <TableCell className="text-muted-foreground text-xs">
                 {reel.claudeModel.split("claude-")[1]?.split("-v")[0] ?? reel.claudeModel}
+              </TableCell>
+              <TableCell className="text-muted-foreground text-xs">
+                {reel.videoModel.split("/")[1] ?? reel.videoModel}
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(reel.createdAt).toLocaleDateString()}
@@ -120,10 +127,31 @@ export default function UserReelsTable() {
           ))}
         </TableBody>
       </Table>
-      <p className="text-xs text-muted-foreground text-right">
-        {data.totalItems} reel{data.totalItems !== 1 ? "s" : ""} &middot; page{" "}
-        {data.currentPage} of {data.totalPages}
-      </p>
+      {data.totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-muted-foreground">
+            Page {page} of {data.totalPages} &middot; {data.totalItems} reel{data.totalItems !== 1 ? "s" : ""}
+          </p>
+          <div className="flex gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page <= 1 || isFetching}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= data.totalPages || isFetching}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

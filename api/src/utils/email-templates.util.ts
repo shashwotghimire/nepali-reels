@@ -7,3 +7,14 @@ export function welcomeEmailTemplate(name: string) {
     `,
   };
 }
+
+export function reelReadyEmailTemplate(name: string, topic: string) {
+  return {
+    subject: `Your reel is ready to publish — "${topic}"`,
+    html: `
+      <h2>Your reel is ready, ${name}!</h2>
+      <p>Your reel on <strong>${topic}</strong> has been generated and is ready to be published.</p>
+      <p>Head over to your dashboard to review and publish it.</p>
+    `,
+  };
+}

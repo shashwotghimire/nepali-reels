@@ -22,17 +22,22 @@ import {
   getVideoDuration,
 } from "../../helpers/video.helper";
 import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
-import { generateThumbnailAgent } from "./agents/thumbnail.agent";
+import { generateThumbnailAgent, generateThumbnailOpenRouter } from "./agents/thumbnail.agent";
 import { saveThumbnailUrl } from "../../repositories/reels.repository";
 import { validateVideoSpec } from "../../helpers/video-spec-validation.helper";
 import { generateAiVideoClips } from "./agents/ai-video-generator.agent";
+import { type VideoModel } from "../../constants/constant";
+import { emailQueue } from "../../queue/email.queue";
+import { getUser } from "../../repositories/user.repository";
+import { reelReadyEmailTemplate } from "../../utils/email-templates.util";
 
 export const initPipelineService = async (
   userId: string,
   topic: string,
   model: string,
+  videoModel: VideoModel,
 ) => {
-  return await createPipeline(userId, topic, model);
+  return await createPipeline(userId, topic, model, videoModel);
 };
 
 export const createPipelineService = async (
@@ -40,6 +45,7 @@ export const createPipelineService = async (
   pipelineId: string,
   topic: string,
   model: string,
+  videoModel: VideoModel,
 ) => {
   console.log(
     `[pipeline:${pipelineId}] starting pipeline for topic: "${topic}" with model: ${model}`,
@@ -105,7 +111,11 @@ export const createPipelineService = async (
   console.log(`[pipeline:${pipelineId}] video spec valid`);
 
   console.log(`[pipeline:${pipelineId}] generating AI video clips...`);
-  const bgVideoPath = await generateAiVideoClips(videoSpec.scenes, pipelineId);
+  const bgVideoPath = await generateAiVideoClips(
+    videoSpec.scenes,
+    pipelineId,
+    videoModel,
+  );
   console.log(
     `[pipeline:${pipelineId}] AI background assembled at ${bgVideoPath}`,
   );
@@ -113,7 +123,8 @@ export const createPipelineService = async (
   console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
   let thumbnailBuffer: Buffer | undefined;
   try {
-    thumbnailBuffer = await generateThumbnailAgent(videoSpec, model);
+    thumbnailBuffer = await generateThumbnailOpenRouter(videoSpec, model, "black-forest-labs/flux.2-pro");
+    // thumbnailBuffer = await generateThumbnailAgent(videoSpec, model);
   } catch (err) {
     console.warn(
       `[pipeline:${pipelineId}] thumbnail generation skipped: ${err instanceof Error ? err.message : err}`,
@@ -152,6 +163,16 @@ export const createPipelineService = async (
   const { key, url } = await uploadToS3(finalVideoPath, pipelineId);
   console.log("Uploaded to S3");
   await saveVideoOutput(pipelineId, userId, key, videoDurationSec);
+
+  const user = await getUser(userId);
+  if (user) {
+    const { subject, html } = reelReadyEmailTemplate(user.name, topic);
+    await emailQueue.add("reel-ready", { to: user.email, subject, html });
+    console.log(
+      `[pipeline:${pipelineId}] reel-ready email queued for ${user.email}`,
+    );
+  }
+
   fs.unlink(finalVideoPath, (err) => {
     if (err)
       console.warn(

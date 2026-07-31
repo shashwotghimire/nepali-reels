@@ -8,6 +8,7 @@ import {
   AI_VIDEO_POLL_INTERVAL_MS,
   AI_VIDEO_POLL_TIMEOUT_MS,
   AI_VIDEO_DURATION_TOLERANCE,
+  type VideoModel,
 } from "../../../constants/constant";
 
 const execFileAsync = promisify(execFile);
@@ -164,7 +165,7 @@ async function normalizeClip(
       "-c:v",
       "libx264",
       "-preset",
-      "fast",
+      "ultrafast",
       "-crf",
       "23",
       "-pix_fmt",
@@ -194,7 +195,7 @@ async function normalizeClip(
       "-c:v",
       "libx264",
       "-preset",
-      "fast",
+      "ultrafast",
       "-crf",
       "23",
       "-pix_fmt",
@@ -258,9 +259,9 @@ async function concatenateClips(
 export async function generateAiVideoClips(
   scenes: Scene[],
   pipelineId: string,
+  videoModel: VideoModel,
 ): Promise<string> {
-  const model = process.env.OPENROUTER_VIDEO_MODEL;
-  if (!model) throw new Error("[ai-video] OPENROUTER_VIDEO_MODEL is not set");
+  const model = videoModel;
 
   const pipelineDir = path.join("src/video", pipelineId);
   await fs.promises.mkdir(pipelineDir, { recursive: true });

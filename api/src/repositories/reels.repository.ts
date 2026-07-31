@@ -7,11 +7,13 @@ export const createPipeline = (
   userId: string,
   topic: string,
   claudeModel: string,
+  videoModel: string,
 ) => {
   return Reels.create({
     userId,
     topic,
     claudeModel,
+    videoModel,
     pipelineStatus: "queued",
   });
 };
