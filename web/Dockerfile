@@ -6,7 +6,13 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN set -a && . ./.env && set +a && npm run build
+
+ARG VITE_API_BASE_URL
+ARG VITE_CDN_DOMAIN
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_CDN_DOMAIN=$VITE_CDN_DOMAIN
+
+RUN npm run build
 
 FROM nginx:alpine
 

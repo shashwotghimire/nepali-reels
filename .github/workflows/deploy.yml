@@ -54,6 +54,9 @@ jobs:
           tags: |
             ${{ env.IMAGE_PREFIX }}/web:${{ env.IMAGE_TAG }}
             ${{ env.IMAGE_PREFIX }}/web:latest
+          build-args: |
+            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+            VITE_CDN_DOMAIN=${{ secrets.VITE_CDN_DOMAIN }}
 
   deploy:
     runs-on: ubuntu-latest
