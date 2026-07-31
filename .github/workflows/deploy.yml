@@ -75,6 +75,7 @@ jobs:
           script: |
             set -e
             cd ~/projects/nepali-reels
-            docker compose pull
-            docker compose up -d
-            docker image prune -f
+            sudo git pull origin main
+            sudo docker compose pull
+            sudo docker compose up -d
+            sudo docker image prune -f
