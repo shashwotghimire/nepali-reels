@@ -1,5 +1,6 @@
 services:
   api:
+    image: ghcr.io/shashwotghimire/nepali-reels/api:latest
     build:
       context: ./api
     ports:
@@ -15,6 +16,7 @@ services:
     networks:
       - internal
   worker:
+    image: ghcr.io/shashwotghimire/nepali-reels/worker:latest
     build:
       context: ./api
     command: node dist/worker.js
@@ -29,6 +31,7 @@ services:
     networks:
       - internal
   web:
+    image: ghcr.io/shashwotghimire/nepali-reels/web:latest
     build:
       context: ./web
     ports:
