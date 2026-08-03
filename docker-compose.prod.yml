@@ -1,0 +1,58 @@
+services:
+  api:
+    image: ${IMAGE_PREFIX}/api:${IMAGE_TAG}
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./api/.env
+    environment:
+      - REDIS_HOST=redis
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+  worker:
+    image: ${IMAGE_PREFIX}/worker:${IMAGE_TAG}
+    command: node dist/worker.js
+    env_file:
+      - ./api/.env
+    environment:
+      - REDIS_HOST=redis
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+  web:
+    image: ${IMAGE_PREFIX}/web:${IMAGE_TAG}
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+  redis:
+    image: redis:8.8-alpine
+    container_name: redis-reels
+    restart: unless-stopped
+    env_file:
+      - ./api/.env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
+    command: sh -c 'redis-server --requirepass "$$REDIS_PASSWORD"'
+    ports:
+      - "6378:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+networks:
+  internal:
+    driver: bridge
+volumes:
+  redis_data:

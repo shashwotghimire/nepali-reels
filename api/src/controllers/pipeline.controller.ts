@@ -4,7 +4,7 @@ import { Request, Response } from "express";
 import asyncHandler from "../utils/asyncHandler.util";
 import { ApiResponse } from "../utils/ApiResponse.util";
 import { pipelineQueue } from "../queue/pipeline.queue";
-import { initPipelineService } from "../services/pipeline/pipeline.service";
+import { initPipelineService, retryPipelineService } from "../services/pipeline/pipeline.service";
 import {
   getReelsService,
   getPipelineByIdService,
@@ -138,6 +138,27 @@ export const deletePipeline = asyncHandler(
     const id = req.params.id as string;
     await deletePipelineService(userId, id);
     res.status(200).json(new ApiResponse(true, "Pipeline deleted successfully", null));
+  },
+);
+
+export const retryPipeline = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = res.locals.user.id;
+    const pipelineId = req.params.id as string;
+
+    const { resumeFrom } = await retryPipelineService(userId, pipelineId);
+
+    await pipelineQueue.add("retry", {
+      userId,
+      pipelineId,
+      resumeFrom,
+    });
+
+    res
+      .status(202)
+      .json(
+        new ApiResponse(true, "Pipeline retry queued", { pipelineId, resumeFrom }),
+      );
   },
 );
 

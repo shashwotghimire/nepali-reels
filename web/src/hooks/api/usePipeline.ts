@@ -4,6 +4,7 @@ import {
   getReelsService,
   getPipelineByIdService,
   deletePipelineService,
+  retryPipelineService,
 } from "@/services/pipeline.service";
 import type {
   GenerateScriptRequest,
@@ -17,13 +18,19 @@ export const useGetReelsOfUser = (params?: GetReelsParams) =>
     placeholderData: (prev) => prev,
   });
 
+const TERMINAL_STATUSES = ["video_generated", "published", "failed"];
+
 export const useGetPipelineById = (id: string) =>
   useQuery({
     queryKey: ["pipeline", id],
     queryFn: () => getPipelineByIdService(id),
     enabled: !!id,
-    refetchInterval: (query) =>
-      query.state.data?.pipelineStatus === "publish_pending" ? 5000 : false,
+    refetchInterval: (query) => {
+      const status = query.state.data?.pipelineStatus;
+      if (!status) return false;
+      if (!TERMINAL_STATUSES.includes(status)) return 5000;
+      return false;
+    },
   });
 
 export const useDeletePipeline = () => {
@@ -42,6 +49,16 @@ export const useGenerateScript = () => {
     mutationFn: (body: GenerateScriptRequest) => generateScriptService(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pipeline", "reels"] });
+    },
+  });
+};
+
+export const useRetryPipeline = (id: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => retryPipelineService(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pipeline", id] });
     },
   });
 };

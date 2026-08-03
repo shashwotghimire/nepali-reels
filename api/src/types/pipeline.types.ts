@@ -2,6 +2,7 @@ export type PipelineStatus =
   | "queued"
   | "script_generated"
   | "script_finalised"
+  | "linguistic_reviewed"
   | "video_spec_generated"
   | "sound_generated"
   | "video_generated"

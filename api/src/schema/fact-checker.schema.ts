@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ScriptOutputSchema } from "./script-writer.schema";
 
 export const FactCheckOutputSchema = z.object({
-  verdict: z.enum(["pass", "revise", "needs_human", "unsafe"]),
+  verdict: z.enum(["pass", "revise", "unsafe"]),
   issues: z.array(
     z.object({
       category: z.enum([

@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useGetPipelineById } from "@/hooks/api/usePipeline";
+import { useGetPipelineById, useRetryPipeline } from "@/hooks/api/usePipeline";
 import { usePublishToTiktok, useGetCreatorInfo } from "@/hooks/api/useTiktok";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -196,6 +196,7 @@ export default function PipelineDetail() {
   const navigate = useNavigate();
   const { data, isPending, error } = useGetPipelineById(id!);
   const { mutate: publishToTiktok, isPending: isPublishing } = usePublishToTiktok(id!);
+  const { mutate: retryPipeline, isPending: isRetrying } = useRetryPipeline(id!);
 
   const canShowPublishForm =
     !!data &&
@@ -238,6 +239,23 @@ export default function PipelineDetail() {
           {data.pipelineStatus.replace(/_/g, " ")}
         </Badge>
       </div>
+
+      {data.pipelineStatus === "failed" && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-4">
+          <div>
+            <span className="font-semibold">Error: </span>
+            {data.failureReason ?? "Pipeline failed. No additional details available."}
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => retryPipeline()}
+            disabled={isRetrying}
+          >
+            {isRetrying ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-6 items-start">
         <div className="space-y-8">

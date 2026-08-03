@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import Reels from "../models/reels.model";
 import { ScriptOutput } from "../schema/script-writer.schema";
 import { VideoSpec } from "../schema/video-spec.schema";
+import { PipelineStatus } from "../types/pipeline.types";
 
 export const createPipeline = (
   userId: string,
@@ -53,6 +54,25 @@ export const saveFinalScript = async (
   }
   pipeline.finalScript = finalScript;
   pipeline.pipelineStatus = "script_finalised";
+  await pipeline.save();
+};
+
+export const saveLinguisticReview = async (
+  pipelineId: string,
+  userId: string,
+  finalScript: ScriptOutput,
+) => {
+  const pipeline = await Reels.findOne({
+    where: {
+      id: pipelineId,
+      userId,
+    },
+  });
+  if (!pipeline) {
+    throw new Error("Reel not found");
+  }
+  pipeline.finalScript = finalScript;
+  pipeline.pipelineStatus = "linguistic_reviewed";
   await pipeline.save();
 };
 
@@ -131,11 +151,25 @@ export const publishToTiktok = async (
   await pipeline.save();
 };
 
-export const markPipelineAsFailed = async (pipelineId: string) => {
+export const markPipelineAsFailed = async (pipelineId: string, failureReason?: string) => {
   const pipeline = await Reels.findOne({ where: { id: pipelineId } });
   if (!pipeline) throw new Error("Reel not found");
   pipeline.pipelineStatus = "failed";
+  if (failureReason) pipeline.failureReason = failureReason;
   await pipeline.save();
+};
+
+export const resetPipelineForRetry = async (
+  pipelineId: string,
+  userId: string,
+  resumeFromStatus: PipelineStatus,
+) => {
+  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
+  if (!pipeline) throw new Error("Reel not found");
+  pipeline.pipelineStatus = resumeFromStatus;
+  pipeline.failureReason = null;
+  await pipeline.save();
+  return pipeline;
 };
 
 export const findPipelineById = (pipelineId: string, userId: string) => {

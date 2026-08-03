@@ -28,6 +28,7 @@ export class Reels extends Model<
   declare s3key: CreationOptional<string | null>;
   declare tiktokPublishId: CreationOptional<string | null>;
   declare thumbnailUrl: CreationOptional<string | null>;
+  declare failureReason: CreationOptional<string | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -79,6 +80,7 @@ Reels.init(
         "queued",
         "script_generated",
         "script_finalised",
+        "linguistic_reviewed",
         "video_spec_generated",
         "sound_generated",
         "video_generated",
@@ -103,6 +105,10 @@ Reels.init(
     },
     thumbnailUrl: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    failureReason: {
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     createdAt: DataTypes.DATE,

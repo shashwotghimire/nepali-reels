@@ -41,3 +41,12 @@ export const getPipelineVideoUrl = (id: string) =>
 export const deletePipelineService = async (id: string) => {
   await axiosInstance.delete(`/api/pipeline/${id}`);
 };
+
+export const retryPipelineService = async (id: string) => {
+  const res = (
+    await axiosInstance.post<{ data: { pipelineId: string; resumeFrom: string } }>(
+      `/api/pipeline/${id}/retry`,
+    )
+  ).data;
+  return res.data;
+};

@@ -77,6 +77,7 @@ export interface Reel {
   videoSpec: VideoSpec | null;
   soundSpec: object | null;
   pipelineStatus: PipelineStatus;
+  failureReason: string | null;
   s3key: string | null;
   videoDurationSec: number | null;
   videoUrl: string | null;

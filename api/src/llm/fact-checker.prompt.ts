@@ -62,12 +62,12 @@ If wording will become incorrect over time, either update it or rewrite it to be
     unless they directly restate a corrected claim.
   - Keep the overall script the same length and equally catchy — you are fixing
     accuracy, not rewriting the script.
-- \`needs_human\`: genuine factual uncertainty that you cannot resolve safely, or anything
-  that needs human judgement. A person must review. Do not attempt a \`revisedScript\`.
 - \`unsafe\`: content that should not be produced as-is and cannot be safely revised.
   Do not attempt a \`revisedScript\`.
   When correcting a factual claim, update EVERY place where that claim appears.
   The final script must not contain conflicting versions of the same fact anywhere.
-  Be specific. Prefer \`revise\` over \`pass\` when wording overclaims. Prefer \`needs_human\`
-  over guessing on sensitive facts. Return ONLY via the provided tool.
+  Be specific. Prefer \`revise\` over \`pass\` when wording overclaims. When facing genuine
+  factual uncertainty you cannot resolve, do your best to revise conservatively — soften
+  the claim, remove the unverifiable detail, or rewrite it to be evergreen. Return ONLY
+  via the provided tool.
 `.trim();
