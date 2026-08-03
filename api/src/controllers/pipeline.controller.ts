@@ -164,7 +164,7 @@ export const retryPipeline = asyncHandler(
 
 export const generateScript = asyncHandler(
   async (req: Request, res: Response) => {
-    const { topic, model, videoModel } = req.body;
+    const { topic, model, videoModel, autoPublish } = req.body;
     const userId = res.locals.user.id;
     const pipeline = await initPipelineService(userId, topic, model, videoModel);
     await pipelineQueue.add("generate", {
@@ -173,6 +173,7 @@ export const generateScript = asyncHandler(
       topic,
       model,
       videoModel,
+      autoPublish: !!autoPublish,
     });
     res
       .status(202)

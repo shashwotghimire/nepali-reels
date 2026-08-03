@@ -306,11 +306,14 @@ export default function PipelineDetail() {
                   <TikTokPublishForm
                     creatorInfo={creatorInfo}
                     videoDurationSec={data.videoDurationSec}
-                    initialCaption={
-                      data.finalScript?.titleOptions[0] ??
-                      data.draftScript?.titleOptions[0] ??
-                      data.topic
-                    }
+                    initialCaption={(() => {
+                      const script = data.finalScript ?? data.draftScript;
+                      const title = script?.titleOptions[0] ?? data.topic;
+                      const hashtags = script?.hashtags
+                        ?.map((h) => (h.startsWith("#") ? h : `#${h}`))
+                        .join(" ") ?? "";
+                      return hashtags ? `${title} ${hashtags}` : title;
+                    })()}
                     isPublishing={isPublishing}
                     onPublish={(fields) =>
                       publishToTiktok({

@@ -6,11 +6,11 @@ import { toUserFriendlyError } from "../utils/error-messages.js";
 export const pipelineWorker = new Worker(
   "pipeline",
   async (job) => {
-    const { userId, pipelineId, topic, model, videoModel, resumeFrom } = job.data;
+    const { userId, pipelineId, topic, model, videoModel, autoPublish, resumeFrom } = job.data;
     if (resumeFrom) {
       await resumePipelineService(userId, pipelineId, resumeFrom);
     } else {
-      await createPipelineService(userId, pipelineId, topic, model, videoModel);
+      await createPipelineService(userId, pipelineId, topic, model, videoModel, !!autoPublish);
     }
   },
   {

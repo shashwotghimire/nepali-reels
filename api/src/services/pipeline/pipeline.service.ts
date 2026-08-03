@@ -37,6 +37,7 @@ import { type VideoModel } from "../../constants/constant";
 import { emailQueue } from "../../queue/email.queue";
 import { getUser } from "../../repositories/user.repository";
 import { reelReadyEmailTemplate } from "../../utils/email-templates.util";
+import { uploadToTiktokService } from "../tiktok.service";
 
 export const initPipelineService = async (
   userId: string,
@@ -53,6 +54,7 @@ export const createPipelineService = async (
   topic: string,
   model: string,
   videoModel: VideoModel,
+  autoPublish = false,
 ) => {
   console.log(
     `[pipeline:${pipelineId}] starting pipeline for topic: "${topic}" with model: ${model}`,
@@ -221,23 +223,32 @@ export const createPipelineService = async (
     }
   }
 
-  // Auto-publish removed — user triggers publish manually from the pipeline detail page.
-  // try {
-  //   console.log(`[pipeline:${pipelineId}] publishing to TikTok...`);
-  //   const tiktokPublishId = await uploadToTiktokService(
-  //     userId,
-  //     pipelineId,
-  //     `https://${url}`,
-  //     finalScript.titleOptions[0]!,
-  //   );
-  //   console.log(
-  //     `[pipeline:${pipelineId}] TikTok publish initiated — publishId: ${tiktokPublishId}`,
-  //   );
-  // } catch (err: unknown) {
-  //   console.warn(
-  //     `[pipeline:${pipelineId}] TikTok publish skipped: ${err instanceof Error ? err.message : err}`,
-  //   );
-  // }
+  if (autoPublish) {
+    try {
+      console.log(`[pipeline:${pipelineId}] auto-publishing to TikTok...`);
+      const hashtags = finalScript.hashtags.map((h: string) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
+      const title = `${finalScript.titleOptions[0]!} ${hashtags}`.trim();
+      const tiktokPublishId = await uploadToTiktokService(
+        userId,
+        pipelineId,
+        title,
+        "PUBLIC_TO_EVERYONE",
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+      );
+      console.log(
+        `[pipeline:${pipelineId}] TikTok auto-publish initiated — publishId: ${tiktokPublishId}`,
+      );
+    } catch (err: unknown) {
+      console.warn(
+        `[pipeline:${pipelineId}] TikTok auto-publish skipped: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
 
   return await findPipelineById(pipelineId, userId);
 };

@@ -99,6 +99,7 @@ export interface GenerateScriptRequest {
   topic: string;
   model?: ClaudeModel;
   videoModel?: VideoModel;
+  autoPublish?: boolean;
 }
 
 export interface GenerateScriptResponse {

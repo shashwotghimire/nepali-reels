@@ -2,7 +2,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -45,6 +47,7 @@ export default function CreateReelButton() {
   const [topic, setTopic] = useState("");
   const [model, setModel] = useState<ClaudeModel>(DEFAULT_MODEL);
   const [videoModel, setVideoModel] = useState<VideoModel>(DEFAULT_VIDEO_MODEL);
+  const [autoPublish, setAutoPublish] = useState(false);
 
   const { mutate, isPending } = useGenerateScript();
 
@@ -52,7 +55,7 @@ export default function CreateReelButton() {
     e.preventDefault();
     if (!topic.trim()) return;
     mutate(
-      { topic: topic.trim(), model, videoModel },
+      { topic: topic.trim(), model, videoModel, autoPublish },
       {
         onSuccess: () => {
           toast.success("Pipeline queued successfully");
@@ -60,6 +63,7 @@ export default function CreateReelButton() {
           setTopic("");
           setModel(DEFAULT_MODEL);
           setVideoModel(DEFAULT_VIDEO_MODEL);
+          setAutoPublish(false);
         },
         onError: () => {
           toast.error("Failed to create reel. Please try again.");
@@ -134,6 +138,18 @@ export default function CreateReelButton() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="auto-publish"
+                checked={autoPublish}
+                onCheckedChange={(v) => setAutoPublish(!!v)}
+                disabled={isPending}
+              />
+              <Label htmlFor="auto-publish" className="text-sm font-normal cursor-pointer">
+                Auto-publish to TikTok when ready
+              </Label>
             </div>
 
             <AlertDialogFooter>
