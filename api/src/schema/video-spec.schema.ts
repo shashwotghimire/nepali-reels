@@ -11,8 +11,8 @@ export const SceneSchema = z
   .refine((s) => s.endSec - s.startSec >= 4, {
     message: "Scene duration must be at least 4 seconds",
   })
-  .refine((s) => s.endSec - s.startSec <= 11, {
-    message: "Scene duration must not exceed 11 seconds",
+  .refine((s) => s.endSec - s.startSec <= 12, {
+    message: "Scene duration must not exceed 12 seconds",
   });
 
 export const VideoSpecSchema = z.object({

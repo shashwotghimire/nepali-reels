@@ -39,7 +39,6 @@ export const AI_VIDEO_MIN_SCENE_DURATION = 4;
 export const AI_VIDEO_MAX_SCENE_DURATION = 11;
 export const AI_VIDEO_MIN_TOTAL_DURATION = 50;
 export const AI_VIDEO_MAX_TOTAL_DURATION = 70;
-// Thumbnail prepends 1s; composite output must stay within this ceiling to keep final ≤ 70s
 export const AI_VIDEO_MAX_COMPOSITE_DURATION = 69;
 export const AI_VIDEO_SCENE_CONTIGUITY_TOLERANCE = 0.05;
 export const AI_VIDEO_DURATION_TOLERANCE = 0.25;

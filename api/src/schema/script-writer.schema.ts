@@ -22,7 +22,7 @@ export const ScriptOutputSchema = z.object({
     .array(
       z.object({
         index: z.number().int(),
-        durationSec: z.number(),
+        durationSec: z.number().min(4, "Shot duration must be at least 4 seconds").max(12, "Shot duration must not exceed 12 seconds"),
         visual: z.string(),
         cameraOrMotion: z.string(),
       }),
@@ -41,7 +41,7 @@ export const ScriptOutputSchema = z.object({
   titleOptions: z.array(z.string()).min(2),
   hashtags: z.array(z.string()).min(3),
   platformDescription: z.string(),
-  estDurationSec: z.number().min(40).max(75),
+  estDurationSec: z.number().min(50, "Script must be at least 50 seconds").max(70, "Script must not exceed 70 seconds"),
 });
 
 export type ScriptOutput = z.infer<typeof ScriptOutputSchema>;

@@ -22,7 +22,7 @@ export const scriptGeneratorAgent = async (
     for (let i = 0; i < FACT_CHECK_RUNS; i++) {
       const response = await client.messages.parse({
         model,
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: scriptWriterPrompt(today),
         tools: [tavliySearchTool],
         output_config: {
