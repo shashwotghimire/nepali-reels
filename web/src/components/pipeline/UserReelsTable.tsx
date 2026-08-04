@@ -34,24 +34,25 @@ export default function UserReelsTable() {
 
   if (isPending) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner className="size-6" />
+      <div className="flex items-center justify-center py-16">
+        <Spinner className="size-5 text-muted-foreground" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="py-12 text-center text-sm text-destructive">
-        Failed to load reels. Please try again.
+      <div className="py-16 text-center text-sm text-destructive">
+        Couldn't load your reels — try refreshing.
       </div>
     );
   }
 
   if (!data?.reels.length) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
-        No reels yet. Create your first reel to get started.
+      <div className="py-16 text-center">
+        <p className="text-sm font-medium">Nothing here yet.</p>
+        <p className="text-sm text-muted-foreground mt-1">Hit <span className="font-medium text-foreground">New reel</span> to kick off your first pipeline.</p>
       </div>
     );
   }
@@ -63,32 +64,32 @@ export default function UserReelsTable() {
           <TableRow>
             <TableHead>Topic</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Model</TableHead>
-            <TableHead>Video Model</TableHead>
-            <TableHead>Cost</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead className="hidden md:table-cell">Model</TableHead>
+            <TableHead className="hidden md:table-cell">Video</TableHead>
+            <TableHead className="hidden sm:table-cell">Cost</TableHead>
+            <TableHead className="hidden sm:table-cell">Created</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.reels.map((reel) => (
             <TableRow key={reel.id}>
-              <TableCell className="font-medium">{reel.topic}</TableCell>
+              <TableCell className="font-medium max-w-[200px] truncate">{reel.topic}</TableCell>
               <TableCell>
                 <Badge variant={PIPELINE_STATUS_VARIANT[reel.pipelineStatus]}>
                   {reel.pipelineStatus.replace(/_/g, " ")}
                 </Badge>
               </TableCell>
-              <TableCell className="text-muted-foreground text-xs">
+              <TableCell className="hidden md:table-cell text-muted-foreground text-xs">
                 {reel.claudeModel.split("claude-")[1]?.split("-v")[0] ?? reel.claudeModel}
               </TableCell>
-              <TableCell className="text-muted-foreground text-xs">
+              <TableCell className="hidden md:table-cell text-muted-foreground text-xs">
                 {reel.videoModel.split("/")[1] ?? reel.videoModel}
               </TableCell>
-              <TableCell className="text-muted-foreground text-xs">
+              <TableCell className="hidden sm:table-cell text-muted-foreground text-xs tabular-nums">
                 {reel.costUsd != null ? `$${reel.costUsd.toFixed(4)}` : "—"}
               </TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="hidden sm:table-cell text-muted-foreground text-xs tabular-nums">
                 {new Date(reel.createdAt).toLocaleDateString()}
               </TableCell>
               <TableCell className="text-right">
@@ -101,29 +102,29 @@ export default function UserReelsTable() {
                     View
                   </Button>
                   <AlertDialog>
-                    <AlertDialogTrigger>
+                    <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
                         Delete
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete pipeline?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete &ldquo;{reel.topic}&rdquo; and all its generated content. This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deletePipeline(reel.id)}
-                          disabled={isDeleting}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this reel?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        &ldquo;{reel.topic}&rdquo; and everything it generated will be gone for good.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deletePipeline(reel.id)}
+                        disabled={isDeleting}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
                   </AlertDialog>
                 </div>
               </TableCell>

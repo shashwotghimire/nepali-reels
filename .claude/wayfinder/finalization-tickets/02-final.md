@@ -7,6 +7,7 @@
 -- auto publish checkmark in form xx
 -- add hashtags to title xx
 -- retry mechanisms. xx
+-- cost/usage table or graph. xx
 
--- cost/usage table or graph
 -- landing w aceternity
+-- d research

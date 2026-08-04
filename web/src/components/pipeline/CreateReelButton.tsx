@@ -82,9 +82,9 @@ export default function CreateReelButton() {
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent size="default">
           <AlertDialogHeader>
-            <AlertDialogTitle>Create new reel</AlertDialogTitle>
+            <AlertDialogTitle>New reel</AlertDialogTitle>
             <AlertDialogDescription>
-              Enter a topic and select a model to start the pipeline.
+              Give it a topic and we'll handle the rest — script, voice, video, post.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -92,7 +92,7 @@ export default function CreateReelButton() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Topic</label>
               <Input
-                placeholder="e.g. History of Everest"
+                placeholder="e.g. The history of Mustang"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 disabled={isPending}
@@ -155,7 +155,7 @@ export default function CreateReelButton() {
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
               <Button type="submit" disabled={!topic.trim() || isPending}>
-                {isPending ? "Creating…" : "Create"}
+                {isPending ? "Starting pipeline…" : "Start pipeline"}
               </Button>
             </AlertDialogFooter>
           </form>

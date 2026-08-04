@@ -1,4 +1,4 @@
-import logoSrc from "@/assets/logo.png";
+import logoSrc from "@/assets/logo.svg";
 
 function Logo({ collapsed = false }: { collapsed?: boolean }) {
   return (

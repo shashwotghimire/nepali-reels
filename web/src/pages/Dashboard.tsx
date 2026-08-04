@@ -4,11 +4,8 @@ import CreateReelButton from "@/components/pipeline/CreateReelButton";
 function Dashboard() {
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome to Nepali Reels.</p>
-        </div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Your reels</h1>
         <CreateReelButton />
       </div>
       <UserReelsTable />

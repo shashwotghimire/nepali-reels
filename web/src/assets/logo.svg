@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Hallmark · component: logo · genre: playful · theme: Brutal
+       strokes: shirorekha + left-leg + right-leg + bridge = simplified Devanagari न -->
+  <rect x="1.25" y="1.25" width="37.5" height="37.5" rx="7" fill="#E07820" stroke="#0E0802" stroke-width="2.5"/>
+  <!-- shirorekha — horizontal top bar -->
+  <line x1="8" y1="13" x2="32" y2="13" stroke="#0E0802" stroke-width="3" stroke-linecap="square"/>
+  <!-- left leg — straight down -->
+  <line x1="13" y1="13" x2="13" y2="30" stroke="#0E0802" stroke-width="3" stroke-linecap="square"/>
+  <!-- bridge — cross bar mid-way -->
+  <line x1="13" y1="22" x2="26" y2="22" stroke="#0E0802" stroke-width="3" stroke-linecap="square"/>
+  <!-- right leg — down then curves out (distinctive न hook) -->
+  <path d="M26,13 L26,27 Q26,32 31,32" stroke="#0E0802" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter" fill="none"/>
+</svg>
