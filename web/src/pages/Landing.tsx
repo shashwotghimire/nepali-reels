@@ -1,4 +1,3 @@
-import Footer from "@/components/common/Footer";
 import logoSrc from "@/assets/logo.svg";
 import { Link } from "react-router-dom";
 

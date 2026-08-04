@@ -102,7 +102,7 @@ export default function UserReelsTable() {
                     View
                   </Button>
                   <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                    <AlertDialogTrigger>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
                         Delete
                       </Button>
