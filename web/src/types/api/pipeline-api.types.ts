@@ -81,6 +81,7 @@ export interface Reel {
   s3key: string | null;
   videoDurationSec: number | null;
   videoUrl: string | null;
+  costUsd: number | null;
   createdAt: string;
   updatedAt: string;
 }

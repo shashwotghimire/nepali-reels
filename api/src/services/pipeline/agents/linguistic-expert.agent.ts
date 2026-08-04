@@ -2,22 +2,25 @@ import type { MessageParam } from "@anthropic-ai/sdk/resources";
 import client from "../../../configs/llm.config";
 import { ScriptOutput } from "../../../schema/script-writer.schema";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { LinguisticExpertOutputSchema } from "../../../schema/linguistic-expert.schema";
+import { LinguisticExpertOutputSchema, type LinguisticExpertOutput } from "../../../schema/linguistic-expert.schema";
 import { linguisticExpertPrompt } from "../../../llm/linguistic-expert.prompt";
 import { tavliySearchTool } from "../../../tools/tavily-search.tool";
 import { runTavilySearch } from "../../../configs/tavily.config";
 import { FACT_CHECK_RUNS } from "../../../constants/constant";
+import { accumulateLlmUsage } from "../../../utils/cost.util";
+import type { AgentResult, LlmUsage } from "../../../types/usage.types";
 
 export const linguisticExpertAgent = async (
   script: ScriptOutput,
   model: string,
-) => {
+): Promise<AgentResult<LinguisticExpertOutput | null>> => {
   const messages: MessageParam[] = [
     {
       role: "user",
       content: `Review this script for natural spoken Nepali.\n${JSON.stringify(script)}`,
     },
   ];
+  const usages: LlmUsage[] = [];
 
   for (let i = 0; i < FACT_CHECK_RUNS; i++) {
     const response = await client.messages.parse({
@@ -30,10 +33,18 @@ export const linguisticExpertAgent = async (
       },
       messages,
     });
+
+    usages.push({
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    });
+
     messages.push({ role: "assistant", content: response.content });
     const toolUses = response.content.filter((b) => b.type === "tool_use");
     if (toolUses.length === 0) {
-      return response.parsed_output;
+      return { data: response.parsed_output, usage: accumulateLlmUsage(usages) };
     }
     const toolCallResults = await Promise.all(
       toolUses.map(async (tool) => {

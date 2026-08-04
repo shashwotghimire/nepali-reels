@@ -1,10 +1,14 @@
 import client from "../../../configs/llm.config";
-import { VideoSpecSchema } from "../../../schema/video-spec.schema";
+import { VideoSpecSchema, type VideoSpec } from "../../../schema/video-spec.schema";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ScriptOutput } from "../../../schema/script-writer.schema";
 import { videoSpecPrompt } from "../../../llm/video-spec.prompt";
+import type { AgentResult } from "../../../types/usage.types";
 
-export const videoSpecGeneratorAgent = async (script: ScriptOutput, model: string) => {
+export const videoSpecGeneratorAgent = async (
+  script: ScriptOutput,
+  model: string,
+): Promise<AgentResult<VideoSpec>> => {
   const today = new Date().toISOString().split("T")[0] ?? "";
   const response = await client.messages.parse({
     model,
@@ -23,5 +27,13 @@ export const videoSpecGeneratorAgent = async (script: ScriptOutput, model: strin
   if (!response.parsed_output) {
     throw new Error("Video spec generator failed");
   }
-  return response.parsed_output;
+  return {
+    data: response.parsed_output,
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  };
 };

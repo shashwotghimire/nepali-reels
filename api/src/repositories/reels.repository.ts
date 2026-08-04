@@ -151,6 +151,17 @@ export const publishToTiktok = async (
   await pipeline.save();
 };
 
+export const savePipelineCost = async (
+  pipelineId: string,
+  userId: string,
+  costUsd: number,
+) => {
+  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
+  if (!pipeline) throw new Error("Reel not found");
+  pipeline.costUsd = costUsd;
+  await pipeline.save();
+};
+
 export const markPipelineAsFailed = async (pipelineId: string, failureReason?: string) => {
   const pipeline = await Reels.findOne({ where: { id: pipelineId } });
   if (!pipeline) throw new Error("Reel not found");

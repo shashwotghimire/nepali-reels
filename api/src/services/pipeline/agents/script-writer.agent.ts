@@ -6,10 +6,17 @@ import { tavliySearchTool } from "../../../tools/tavily-search.tool";
 import { runTavilySearch } from "../../../configs/tavily.config";
 import { FACT_CHECK_RUNS } from "../../../constants/constant";
 import { scriptWriterPrompt } from "../../../llm/script-writer.prompt";
+import { accumulateLlmUsage } from "../../../utils/cost.util";
+import type { AgentResult, LlmUsage } from "../../../types/usage.types";
+import type { ScriptOutput } from "../../../schema/script-writer.schema";
 
-export const scriptGeneratorAgent = async (topic: string, model: string) => {
+export const scriptGeneratorAgent = async (
+  topic: string,
+  model: string,
+): Promise<AgentResult<ScriptOutput>> => {
   const today = new Date().toISOString().split("T")[0] ?? "";
   const messages: MessageParam[] = [{ role: "user", content: topic }];
+  const usages: LlmUsage[] = [];
 
   try {
     for (let i = 0; i < FACT_CHECK_RUNS; i++) {
@@ -24,13 +31,20 @@ export const scriptGeneratorAgent = async (topic: string, model: string) => {
         messages,
       });
 
+      usages.push({
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+      });
+
       messages.push({ role: "assistant", content: response.content });
 
       const toolUses = response.content.filter((b) => b.type === "tool_use");
       if (toolUses.length === 0) {
         if (!response.parsed_output)
           throw new Error("Script writer returned null output");
-        return response.parsed_output;
+        return { data: response.parsed_output, usage: accumulateLlmUsage(usages) };
       }
 
       const toolCallResults = await Promise.all(

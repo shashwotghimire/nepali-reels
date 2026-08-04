@@ -65,6 +65,7 @@ export default function UserReelsTable() {
             <TableHead>Status</TableHead>
             <TableHead>Model</TableHead>
             <TableHead>Video Model</TableHead>
+            <TableHead>Cost</TableHead>
             <TableHead>Created</TableHead>
             <TableHead />
           </TableRow>
@@ -83,6 +84,9 @@ export default function UserReelsTable() {
               </TableCell>
               <TableCell className="text-muted-foreground text-xs">
                 {reel.videoModel.split("/")[1] ?? reel.videoModel}
+              </TableCell>
+              <TableCell className="text-muted-foreground text-xs">
+                {reel.costUsd != null ? `$${reel.costUsd.toFixed(4)}` : "—"}
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(reel.createdAt).toLocaleDateString()}

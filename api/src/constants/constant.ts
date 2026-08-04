@@ -18,6 +18,7 @@ export const ALIGNMENT_MAX_LINE_SECONDS = 4.0;
 export const CLAUDE_MODELS = {
   "Haiku 4.5": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
   "Sonnet 4.5": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+  "Sonnet 4.6": "global.anthropic.claude-sonnet-4-6",
   "Opus 4.5": "global.anthropic.claude-opus-4-5-20251101-v1:0",
   "Opus 4.6": "global.anthropic.claude-opus-4-6-v1",
 } as const;
@@ -42,3 +43,70 @@ export const AI_VIDEO_MAX_TOTAL_DURATION = 70;
 export const AI_VIDEO_MAX_COMPOSITE_DURATION = 69;
 export const AI_VIDEO_SCENE_CONTIGUITY_TOLERANCE = 0.05;
 export const AI_VIDEO_DURATION_TOLERANCE = 0.25;
+
+export const LLM_PRICING = {
+  "global.anthropic.claude-haiku-4-5-20251001-v1:0": {
+    input: 1.0,
+    output: 5.0,
+    cacheWrite: 1.25,
+    cacheRead: 0.1,
+  },
+  "global.anthropic.claude-sonnet-4-5-20250929-v1:0": {
+    input: 3.0,
+    output: 15.0,
+    cacheWrite: 3.75,
+    cacheRead: 0.3,
+  },
+  "global.anthropic.claude-sonnet-4-6": {
+    input: 3.0,
+    output: 15.0,
+    cacheWrite: 3.75,
+    cacheRead: 0.3,
+  },
+  "global.anthropic.claude-opus-4-5-20251101-v1:0": {
+    input: 5.0,
+    output: 25.0,
+    cacheWrite: 6.25,
+    cacheRead: 0.5,
+  },
+  "global.anthropic.claude-opus-4-6-v1": {
+    input: 5.0,
+    output: 25.0,
+    cacheWrite: 6.25,
+    cacheRead: 0.5,
+  },
+} as const;
+
+export const TTS_PRICING = {
+  "gemini-3.1-flash-tts-preview": {
+    input: 1.0,
+    output: 20.0,
+  },
+} as const;
+
+// Cost per minute of audio (USD)
+export const ALIGNMENT_PRICING = {
+  elevenlabs: {
+    perMinute: 0.0036,
+  },
+} as const;
+
+// Cost per second of generated video (USD)
+export const VIDEO_GENERATION_PRICING = {
+  "bytedance/seedance-1-5-pro": {
+    perSecond: 0.01153,
+  },
+  "alibaba/wan-2.6": {
+    perSecond: 0.04,
+  },
+  "x-ai/grok-imagine-video": {
+    perSecond: 0.05,
+  },
+} as const;
+
+// Cost per megapixel (USD)
+export const IMAGE_PRICING = {
+  "black-forest-labs/flux.2-pro": {
+    perMegapixel: 0.03,
+  },
+} as const;

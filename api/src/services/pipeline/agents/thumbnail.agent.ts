@@ -2,11 +2,12 @@ import client from "../../../configs/llm.config";
 import { openRouterClient } from "../../../configs/openrouter.config";
 import { THUMBNAIL_AGENT_SYSTEM_PROMPT } from "../../../llm/thumbnail.prompt";
 import type { VideoSpec } from "../../../schema/video-spec.schema";
+import type { AgentResult } from "../../../types/usage.types";
 
 export const generateThumbnailAgent = async (
   videoSpec: VideoSpec,
   model: string,
-): Promise<Buffer> => {
+): Promise<AgentResult<Buffer>> => {
   const promptResponse = await client.messages.create({
     model,
     max_tokens: 512,
@@ -31,14 +32,22 @@ export const generateThumbnailAgent = async (
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Pollinations request failed: ${response.status}`);
   const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  return {
+    data: Buffer.from(arrayBuffer),
+    usage: {
+      inputTokens: promptResponse.usage.input_tokens,
+      outputTokens: promptResponse.usage.output_tokens,
+      cacheWriteTokens: promptResponse.usage.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: promptResponse.usage.cache_read_input_tokens ?? 0,
+    },
+  };
 };
 
 export const generateThumbnailOpenRouter = async (
   videoSpec: VideoSpec,
   model: string,
   imageModel: string,
-): Promise<Buffer> => {
+): Promise<AgentResult<Buffer>> => {
   const promptResponse = await client.messages.create({
     model,
     max_tokens: 512,
@@ -70,5 +79,13 @@ export const generateThumbnailOpenRouter = async (
   const b64 = (result as { data: { b64Json: string }[] }).data[0]?.b64Json;
   if (!b64) throw new Error("[thumbnail] OpenRouter image generation returned no data");
 
-  return Buffer.from(b64, "base64");
+  return {
+    data: Buffer.from(b64, "base64"),
+    usage: {
+      inputTokens: promptResponse.usage.input_tokens,
+      outputTokens: promptResponse.usage.output_tokens,
+      cacheWriteTokens: promptResponse.usage.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: promptResponse.usage.cache_read_input_tokens ?? 0,
+    },
+  };
 };
