@@ -74,18 +74,26 @@ export const createPipelineService = async (
   const addCost = async (amount: number) => {
     runningCost += amount;
     await savePipelineCost(pipelineId, userId, runningCost);
-    console.log(`[pipeline:${pipelineId}] cost so far: $${runningCost.toFixed(6)}`);
+    console.log(
+      `[pipeline:${pipelineId}] cost so far: $${runningCost.toFixed(6)}`,
+    );
   };
 
   console.log(`[pipeline:${pipelineId}] generating draft script...`);
-  const { data: draftScript, usage: scriptUsage } = await scriptGeneratorAgent(topic, model);
+  const { data: draftScript, usage: scriptUsage } = await scriptGeneratorAgent(
+    topic,
+    model,
+  );
   await saveDraftScript(pipelineId, userId, draftScript);
   await addCost(calculateLlmCost(scriptUsage, model as ClaudeModel));
   console.log(`draft script: \n${JSON.stringify(draftScript)}`);
   console.log(`[pipeline:${pipelineId}] draft script saved`);
 
   console.log(`[pipeline:${pipelineId}] running fact check...`);
-  const { data: factCheck, usage: factCheckUsage } = await factCheckerAgent(draftScript, model);
+  const { data: factCheck, usage: factCheckUsage } = await factCheckerAgent(
+    draftScript,
+    model,
+  );
   console.log(`final script: \n${JSON.stringify(factCheck)}`);
   console.log(
     `[pipeline:${pipelineId}] fact check verdict: ${factCheck?.verdict}`,
@@ -110,7 +118,8 @@ export const createPipelineService = async (
   console.log(`[pipeline:${pipelineId}] final script saved`);
 
   console.log(`[pipeline:${pipelineId}] running linguistic review...`);
-  const { data: linguisticReview, usage: linguisticUsage } = await linguisticExpertAgent(finalScript, model);
+  const { data: linguisticReview, usage: linguisticUsage } =
+    await linguisticExpertAgent(finalScript, model);
   console.log(
     `[pipeline:${pipelineId}] linguistic review verdict: ${linguisticReview?.verdict}`,
   );
@@ -122,15 +131,26 @@ export const createPipelineService = async (
   console.log(`[pipeline:${pipelineId}] linguistic review saved`);
 
   console.log(`[pipeline:${pipelineId}] generating video spec...`);
-  const { data: videoSpec, usage: videoSpecUsage } = await videoSpecGeneratorAgent(finalScript, model);
+  const { data: videoSpec, usage: videoSpecUsage } =
+    await videoSpecGeneratorAgent(finalScript, model);
   await saveVideoSpec(pipelineId, userId, videoSpec);
   await addCost(calculateLlmCost(videoSpecUsage, model as ClaudeModel));
+
+  console.log(`[pipeline:${pipelineId}] validating video spec...`);
+  validateVideoSpec(videoSpec);
+  console.log(`[pipeline:${pipelineId}] video spec valid`);
+
   console.log(`[pipeline:${pipelineId}] video spec saved`);
 
   console.log(`[pipeline:${pipelineId}] generating audio...`);
   const soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
   await saveAudioSpec(pipelineId, userId, soundSpec);
-  await addCost(calculateTtsCost(videoSpec.voiceoverText.length, "gemini-3.1-flash-tts-preview"));
+  await addCost(
+    calculateTtsCost(
+      videoSpec.voiceoverText.length,
+      "gemini-3.1-flash-tts-preview",
+    ),
+  );
   console.log(`[pipeline:${pipelineId}] audio saved`);
 
   console.log(`[pipeline:${pipelineId}] running forced alignment...`);
@@ -141,14 +161,11 @@ export const createPipelineService = async (
   console.log(
     `[pipeline:${pipelineId}] forced alignment done — ${alignedCaptions.length} caption chunks`,
   );
-  const alignmentMinutes = alignedCaptions.length > 0
-    ? (alignedCaptions[alignedCaptions.length - 1]!.endSec / 60)
-    : 0;
+  const alignmentMinutes =
+    alignedCaptions.length > 0
+      ? alignedCaptions[alignedCaptions.length - 1]!.endSec / 60
+      : 0;
   await addCost(calculateAlignmentCost(alignmentMinutes));
-
-  console.log(`[pipeline:${pipelineId}] validating video spec...`);
-  validateVideoSpec(videoSpec);
-  console.log(`[pipeline:${pipelineId}] video spec valid`);
 
   console.log(`[pipeline:${pipelineId}] generating AI video clips...`);
   const bgVideoPath = await generateAiVideoClips(
@@ -167,7 +184,8 @@ export const createPipelineService = async (
     const { data: buf, usage: thumbUsage } = await generateThumbnailOpenRouter(
       videoSpec,
       model,
-      "black-forest-labs/flux.2-pro",
+      // "black-forest-labs/flux.2-pro",
+      "google/gemini-3.1-flash-image",
     );
     thumbnailBuffer = buf;
     thumbnailLlmUsage = thumbUsage;
@@ -181,7 +199,9 @@ export const createPipelineService = async (
     await addCost(calculateLlmCost(thumbnailLlmUsage, model as ClaudeModel));
   }
   if (thumbnailBuffer) {
-    await addCost(calculateImageCost(720, 1280, "black-forest-labs/flux.2-pro"));
+    await addCost(
+      calculateImageCost(720, 1280, "black-forest-labs/flux.2-pro"),
+    );
   }
 
   console.log(`[pipeline:${pipelineId}] compositing video...`);
@@ -217,7 +237,9 @@ export const createPipelineService = async (
   console.log("Uploaded to S3");
   await saveVideoOutput(pipelineId, userId, key, videoDurationSec);
   await addCost(calculateVideoCost(videoDurationSec, videoModel));
-  console.log(`[pipeline:${pipelineId}] total cost: $${runningCost.toFixed(6)}`);
+  console.log(
+    `[pipeline:${pipelineId}] total cost: $${runningCost.toFixed(6)}`,
+  );
 
   const user = await getUser(userId);
   if (user) {
@@ -263,7 +285,9 @@ export const createPipelineService = async (
   if (autoPublish) {
     try {
       console.log(`[pipeline:${pipelineId}] auto-publishing to TikTok...`);
-      const hashtags = finalScript.hashtags.map((h: string) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
+      const hashtags = finalScript.hashtags
+        .map((h: string) => (h.startsWith("#") ? h : `#${h}`))
+        .join(" ");
       const title = `${finalScript.titleOptions[0]!} ${hashtags}`.trim();
       const tiktokPublishId = await uploadToTiktokService(
         userId,
@@ -363,7 +387,9 @@ export const resumePipelineService = async (
   const addCost = async (amount: number) => {
     runningCost += amount;
     await savePipelineCost(pipelineId, userId, runningCost);
-    console.log(`[pipeline:${pipelineId}] cost so far: $${runningCost.toFixed(6)}`);
+    console.log(
+      `[pipeline:${pipelineId}] cost so far: $${runningCost.toFixed(6)}`,
+    );
   };
 
   if (resumeIndex < 1) {
@@ -377,15 +403,26 @@ export const resumePipelineService = async (
 
   if (resumeIndex < 2) {
     console.log(`[pipeline:${pipelineId}] running fact check...`);
-    const { data: factCheck, usage } = await factCheckerAgent(draftScript, model);
+    const { data: factCheck, usage } = await factCheckerAgent(
+      draftScript,
+      model,
+    );
     if (factCheck?.verdict === "pass") {
       finalScript = draftScript;
     } else if (factCheck?.verdict === "revise") {
       finalScript = factCheck.revisedScript!;
     } else if (factCheck?.verdict === "unsafe") {
-      throw new ApiError(400, `Script is unsafe: ${JSON.stringify(factCheck.issues, null, 2)}`, "Script is not safe.");
+      throw new ApiError(
+        400,
+        `Script is unsafe: ${JSON.stringify(factCheck.issues, null, 2)}`,
+        "Script is not safe.",
+      );
     } else {
-      throw new ApiError(500, "Unexpected fact-check verdict", "Internal error");
+      throw new ApiError(
+        500,
+        "Unexpected fact-check verdict",
+        "Internal error",
+      );
     }
     await saveFinalScript(pipelineId, userId, finalScript);
     await addCost(calculateLlmCost(usage, model as ClaudeModel));
@@ -394,7 +431,10 @@ export const resumePipelineService = async (
 
   if (resumeIndex < 3) {
     console.log(`[pipeline:${pipelineId}] running linguistic review...`);
-    const { data: linguisticReview, usage } = await linguisticExpertAgent(finalScript, model);
+    const { data: linguisticReview, usage } = await linguisticExpertAgent(
+      finalScript,
+      model,
+    );
     if (linguisticReview?.verdict === "revise") {
       finalScript = linguisticReview.revisedScript!;
     }
@@ -416,16 +456,28 @@ export const resumePipelineService = async (
     console.log(`[pipeline:${pipelineId}] generating audio...`);
     soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
     await saveAudioSpec(pipelineId, userId, soundSpec);
-    await addCost(calculateTtsCost(videoSpec.voiceoverText.length, "gemini-3.1-flash-tts-preview"));
+    await addCost(
+      calculateTtsCost(
+        videoSpec.voiceoverText.length,
+        "gemini-3.1-flash-tts-preview",
+      ),
+    );
     console.log(`[pipeline:${pipelineId}] audio saved`);
   }
 
   if (resumeIndex < 6) {
     if (!fs.existsSync(soundSpec.audioFilePath)) {
-      console.log(`[pipeline:${pipelineId}] audio file missing, regenerating...`);
+      console.log(
+        `[pipeline:${pipelineId}] audio file missing, regenerating...`,
+      );
       soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
       await saveAudioSpec(pipelineId, userId, soundSpec);
-      await addCost(calculateTtsCost(videoSpec.voiceoverText.length, "gemini-3.1-flash-tts-preview"));
+      await addCost(
+        calculateTtsCost(
+          videoSpec.voiceoverText.length,
+          "gemini-3.1-flash-tts-preview",
+        ),
+      );
     }
 
     console.log(`[pipeline:${pipelineId}] running forced alignment...`);
@@ -433,9 +485,10 @@ export const resumePipelineService = async (
       soundSpec.audioFilePath,
       videoSpec.voiceoverText,
     );
-    const alignmentMinutes = alignedCaptions.length > 0
-      ? (alignedCaptions[alignedCaptions.length - 1]!.endSec / 60)
-      : 0;
+    const alignmentMinutes =
+      alignedCaptions.length > 0
+        ? alignedCaptions[alignedCaptions.length - 1]!.endSec / 60
+        : 0;
     await addCost(calculateAlignmentCost(alignmentMinutes));
 
     console.log(`[pipeline:${pipelineId}] validating video spec...`);
@@ -452,11 +505,12 @@ export const resumePipelineService = async (
     let thumbnailBuffer: Buffer | undefined;
     let thumbnailLlmUsage: LlmUsage | undefined;
     try {
-      const { data: buf, usage: thumbUsage } = await generateThumbnailOpenRouter(
-        videoSpec,
-        model,
-        "black-forest-labs/flux.2-pro",
-      );
+      const { data: buf, usage: thumbUsage } =
+        await generateThumbnailOpenRouter(
+          videoSpec,
+          model,
+          "black-forest-labs/flux.2-pro",
+        );
       thumbnailBuffer = buf;
       thumbnailLlmUsage = thumbUsage;
     } catch (err) {
@@ -468,7 +522,9 @@ export const resumePipelineService = async (
       await addCost(calculateLlmCost(thumbnailLlmUsage, model as ClaudeModel));
     }
     if (thumbnailBuffer) {
-      await addCost(calculateImageCost(720, 1280, "black-forest-labs/flux.2-pro"));
+      await addCost(
+        calculateImageCost(720, 1280, "black-forest-labs/flux.2-pro"),
+      );
     }
 
     console.log(`[pipeline:${pipelineId}] compositing video...`);
@@ -501,7 +557,9 @@ export const resumePipelineService = async (
     const { key } = await uploadToS3(finalVideoPath, pipelineId);
     await saveVideoOutput(pipelineId, userId, key, videoDurationSec);
     await addCost(calculateVideoCost(videoDurationSec, videoModel));
-    console.log(`[pipeline:${pipelineId}] total cost: $${runningCost.toFixed(6)}`);
+    console.log(
+      `[pipeline:${pipelineId}] total cost: $${runningCost.toFixed(6)}`,
+    );
 
     const user = await getUser(userId);
     if (user) {
@@ -510,11 +568,18 @@ export const resumePipelineService = async (
     }
 
     fs.unlink(finalVideoPath, () => {});
-    fs.rm(`src/video/${pipelineId}`, { recursive: true, force: true }, () => {});
+    fs.rm(
+      `src/video/${pipelineId}`,
+      { recursive: true, force: true },
+      () => {},
+    );
 
     if (thumbnailBuffer) {
       try {
-        const { url: tUrl } = await uploadThumbnailToS3(thumbnailBuffer, pipelineId);
+        const { url: tUrl } = await uploadThumbnailToS3(
+          thumbnailBuffer,
+          pipelineId,
+        );
         await saveThumbnailUrl(pipelineId, userId, tUrl);
       } catch (err) {
         console.warn(

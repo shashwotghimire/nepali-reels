@@ -235,9 +235,16 @@ export default function PipelineDetail() {
             {new Date(data.createdAt).toLocaleString()}
           </p>
         </div>
-        <Badge variant={PIPELINE_STATUS_VARIANT[data.pipelineStatus]}>
-          {data.pipelineStatus.replace(/_/g, " ")}
-        </Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge variant={PIPELINE_STATUS_VARIANT[data.pipelineStatus]}>
+            {data.pipelineStatus.replace(/_/g, " ")}
+          </Badge>
+          {data.costUsd != null && (
+            <p className="text-xs text-muted-foreground tabular-nums">
+              ${data.costUsd.toFixed(4)}
+            </p>
+          )}
+        </div>
       </div>
 
       {data.pipelineStatus === "failed" && (

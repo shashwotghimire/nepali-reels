@@ -30,7 +30,8 @@ export const generateThumbnailAgent = async (
   const seed = Math.floor(Math.random() * 1_000_000);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?seed=${seed}&width=720&height=1280&nologo=true`;
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Pollinations request failed: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Pollinations request failed: ${response.status}`);
   const arrayBuffer = await response.arrayBuffer();
   return {
     data: Buffer.from(arrayBuffer),
@@ -77,7 +78,8 @@ export const generateThumbnailOpenRouter = async (
   });
 
   const b64 = (result as { data: { b64Json: string }[] }).data[0]?.b64Json;
-  if (!b64) throw new Error("[thumbnail] OpenRouter image generation returned no data");
+  if (!b64)
+    throw new Error("[thumbnail] OpenRouter image generation returned no data");
 
   return {
     data: Buffer.from(b64, "base64"),
