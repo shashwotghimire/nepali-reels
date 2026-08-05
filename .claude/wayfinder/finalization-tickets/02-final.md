@@ -9,5 +9,4 @@
 -- retry mechanisms. xx
 -- cost/usage table or graph. xx
 
--- landing w aceternity
 -- d research
