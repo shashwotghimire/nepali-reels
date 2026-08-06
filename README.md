@@ -55,7 +55,7 @@ User (web)
 | Database | PostgreSQL (Neon) via Sequelize 6 |
 | Jobs | BullMQ 5 + Redis |
 | LLM | Claude via AWS Bedrock |
-| TTS | Gemini 2.5 TTS |
+| TTS | `gemini-3.1-flash-tts-preview` (voice: Aoede) |
 | Video alignment | ElevenLabs forced alignment |
 | AI video gen | OpenRouter (Seedance 1.5 Pro / Wan 2.6 / Grok) |
 | Media | FFmpeg + skia-canvas (Devanagari subtitle rendering) |
