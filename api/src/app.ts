@@ -1,9 +1,11 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { apiReference } from "@scalar/express-api-reference";
 import { auth } from "./lib/auth";
 import { toNodeHandler } from "better-auth/node";
 import { errorHandler } from "./middlewares/error.middleware";
+import { openApiDocument } from "./docs/openapi";
 import tiktokRouter from "./routes/tiktok.route";
 import userRoute from "./routes/user.route";
 import pipelineRouter from "./routes/pipeline.route";
@@ -30,6 +32,14 @@ app.use("/api/users", userRoute);
 app.use("/api/tiktok", tiktokRouter);
 app.use("/api/pipeline", pipelineRouter);
 app.use("/api/analytics", analyticsRouter);
+
+app.use(
+  "/docs",
+  apiReference({
+    pageTitle: "Nepali Reels API",
+    spec: { content: openApiDocument },
+  }),
+);
 
 app.use(errorHandler);
 export default app;
