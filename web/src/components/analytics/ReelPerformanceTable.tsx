@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export function ReelPerformanceTable({ reels, topPerformerId }: Props) {
             <Tooltip
               content={
                 <ChartTooltipContent
-                  formatter={(value, name, props) => {
+                  formatter={(value, _name, props) => {
                     const d = props.payload;
                     return [
                       <span key="tip" className="flex flex-col gap-0.5 text-xs">

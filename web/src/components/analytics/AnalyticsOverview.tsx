@@ -1,5 +1,4 @@
 import { ReelPerformanceTable } from "./ReelPerformanceTable";
-import { AnalyticsSummary } from "./AnalyticsSummary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AnalyticsRecord, ImproverOutput } from "@/types/api/analytics-api.types";
 
