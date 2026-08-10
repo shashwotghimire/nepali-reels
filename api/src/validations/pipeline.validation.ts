@@ -4,6 +4,9 @@ import { CLAUDE_MODELS, VIDEO_MODELS } from "../constants/constant";
 const claudeModelValues = Object.values(CLAUDE_MODELS) as [string, ...string[]];
 const videoModelValues = Object.values(VIDEO_MODELS) as [string, ...string[]];
 
+export const TTS_VOICES = ["aoede", "fenrir", "puck", "zephyr", "kore", "charon"] as const;
+export type TtsVoice = typeof TTS_VOICES[number];
+
 export const getPipelineByIdSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid pipeline ID"),
@@ -23,5 +26,6 @@ export const generateScriptSchema = z.object({
     topic: z.string().min(3, "Topic must be at least 3 characters"),
     model: z.enum(claudeModelValues).default(CLAUDE_MODELS["Sonnet 4.5"]),
     videoModel: z.enum(videoModelValues).default(VIDEO_MODELS["Seedance 1.5 Pro"]),
+    ttsVoice: z.enum(TTS_VOICES).default("aoede"),
   }),
 });

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Library, TrendingUp, Settings, Users } from "lucide-react";
+import { LayoutDashboard, Library, TrendingUp, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,6 @@ const navItems = [
   { to: "/connections", label: "Connections", icon: Users },
   { to: "/library", label: "Library", icon: Library },
   { to: "/analytics", label: "Analytics", icon: TrendingUp },
-  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 function AppSidebar() {

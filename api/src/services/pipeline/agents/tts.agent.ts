@@ -5,13 +5,14 @@ import { VideoSpec } from "../../../schema/video-spec.schema";
 export const generateTextToSpeechAgent = async (
   videoSpec: VideoSpec,
   pipelineId: string,
+  ttsVoice = "aoede",
 ) => {
   const response = await gClient.interactions.create({
     model: "gemini-3.1-flash-tts-preview",
     input: `${videoSpec.voiceoverText} and ensure the length of the audio is ${videoSpec.scenes}`,
     response_format: { type: "audio" },
     generation_config: {
-      speech_config: [{ voice: "Aoede" }],
+      speech_config: [{ voice: ttsVoice }],
     },
   });
   if (!response) {

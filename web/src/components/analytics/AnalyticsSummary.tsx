@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Markdown from "react-markdown";
 
 interface Props {
   summary: string;
@@ -11,7 +12,7 @@ export function AnalyticsSummary({ summary }: Props) {
         <CardTitle className="text-base">Summary</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-sm leading-6 text-foreground/80">{summary}</p>
+        <Markdown>{summary}</Markdown>
       </CardContent>
     </Card>
   );

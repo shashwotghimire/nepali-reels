@@ -34,7 +34,7 @@ app.use("/api/pipeline", pipelineRouter);
 app.use("/api/analytics", analyticsRouter);
 
 app.use(
-  "/docs",
+  "api//docs",
   apiReference({
     pageTitle: "Nepali Reels API",
     spec: { content: openApiDocument },

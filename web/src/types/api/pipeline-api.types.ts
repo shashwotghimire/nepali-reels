@@ -72,6 +72,7 @@ export interface Reel {
   topic: string;
   claudeModel: ClaudeModel;
   videoModel: VideoModel;
+  ttsVoice: TtsVoice;
   draftScript: ScriptOutput | null;
   finalScript: ScriptOutput | null;
   videoSpec: VideoSpec | null;
@@ -89,18 +90,21 @@ export interface Reel {
 export type ClaudeModel =
   | "global.anthropic.claude-haiku-4-5-20251001-v1:0"
   | "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
-  | "global.anthropic.claude-opus-4-5-20251101-v1:0";
+  | "global.anthropic.claude-opus-4-5-20251101-v1:0"
+  | "global.anthropic.claude-sonnet-4-6"
+  | "global.anthropic.claude-opus-4-6-v1";
 
 export type VideoModel =
-  | "bytedance/seedance-1-5-pro"
-  | "alibaba/wan-2.6"
-  | "x-ai/grok-imagine-video";
+  "bytedance/seedance-1-5-pro" | "alibaba/wan-2.6" | "x-ai/grok-imagine-video";
+
+export type TtsVoice = "aoede" | "fenrir" | "puck" | "zephyr" | "kore" | "charon";
 
 export interface GenerateScriptRequest {
   topic: string;
   model?: ClaudeModel;
   videoModel?: VideoModel;
   autoPublish?: boolean;
+  ttsVoice?: TtsVoice;
 }
 
 export interface GenerateScriptResponse {

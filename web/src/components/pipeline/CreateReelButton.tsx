@@ -22,16 +22,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGenerateScript } from "@/hooks/api/usePipeline";
-import type { ClaudeModel, VideoModel } from "@/types/api/pipeline-api.types";
+import type { ClaudeModel, VideoModel, TtsVoice } from "@/types/api/pipeline-api.types";
 
-const CLAUDE_MODELS: ClaudeModel[] = [
-  "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-  "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-  "global.anthropic.claude-opus-4-5-20251101-v1:0",
+const CLAUDE_MODELS: { value: ClaudeModel; label: string }[] = [
+  {
+    value: "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    label: "Claude Haiku 4.5",
+  },
+  {
+    value: "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    label: "Claude Sonnet 4.5",
+  },
+  {
+    value: "global.anthropic.claude-opus-4-5-20251101-v1:0",
+    label: "Claude Opus 4.5",
+  },
+  { value: "global.anthropic.claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+  { value: "global.anthropic.claude-opus-4-6-v1", label: "Claude Opus 4.6" },
 ];
-
-const claudeModelLabel = (model: ClaudeModel) =>
-  model.split("claude-")[1]?.split("-v")[0] ?? model;
 
 const VIDEO_MODELS: { value: VideoModel; label: string }[] = [
   { value: "bytedance/seedance-1-5-pro", label: "Seedance 1.5 Pro" },
@@ -39,14 +47,27 @@ const VIDEO_MODELS: { value: VideoModel; label: string }[] = [
   { value: "x-ai/grok-imagine-video", label: "Grok Imagine Video" },
 ];
 
-const DEFAULT_MODEL: ClaudeModel = "global.anthropic.claude-sonnet-4-5-20250929-v1:0";
+const DEFAULT_MODEL: ClaudeModel =
+  "global.anthropic.claude-sonnet-4-5-20250929-v1:0";
 const DEFAULT_VIDEO_MODEL: VideoModel = "bytedance/seedance-1-5-pro";
+
+const TTS_VOICES: { value: TtsVoice; label: string }[] = [
+  { value: "aoede", label: "Aoede — female, breezy, middle pitch" },
+  { value: "fenrir", label: "Fenrir — male, excitable, lower middle pitch" },
+  { value: "puck", label: "Puck — male, upbeat, middle pitch" },
+  { value: "zephyr", label: "Zephyr — female, bright, higher pitch" },
+  { value: "kore", label: "Kore — female, firm, middle pitch" },
+  { value: "charon", label: "Charon — male, informative, lower pitch" },
+];
+
+const DEFAULT_TTS_VOICE: TtsVoice = "aoede";
 
 export default function CreateReelButton() {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState("");
   const [model, setModel] = useState<ClaudeModel>(DEFAULT_MODEL);
   const [videoModel, setVideoModel] = useState<VideoModel>(DEFAULT_VIDEO_MODEL);
+  const [ttsVoice, setTtsVoice] = useState<TtsVoice>(DEFAULT_TTS_VOICE);
   const [autoPublish, setAutoPublish] = useState(false);
 
   const { mutate, isPending } = useGenerateScript();
@@ -55,7 +76,7 @@ export default function CreateReelButton() {
     e.preventDefault();
     if (!topic.trim()) return;
     mutate(
-      { topic: topic.trim(), model, videoModel, autoPublish },
+      { topic: topic.trim(), model, videoModel, autoPublish, ttsVoice },
       {
         onSuccess: () => {
           toast.success("Pipeline queued successfully");
@@ -63,12 +84,13 @@ export default function CreateReelButton() {
           setTopic("");
           setModel(DEFAULT_MODEL);
           setVideoModel(DEFAULT_VIDEO_MODEL);
+          setTtsVoice(DEFAULT_TTS_VOICE);
           setAutoPublish(false);
         },
         onError: () => {
           toast.error("Failed to create reel. Please try again.");
         },
-      }
+      },
     );
   };
 
@@ -80,15 +102,16 @@ export default function CreateReelButton() {
       </Button>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent size="default">
+        <AlertDialogContent size="lg">
           <AlertDialogHeader>
             <AlertDialogTitle>New reel</AlertDialogTitle>
             <AlertDialogDescription>
-              Give it a topic and we'll handle the rest — script, voice, video, post.
+              Give it a topic and we'll handle the rest — script, voice, video,
+              post.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 ">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Topic</label>
               <Input
@@ -108,12 +131,14 @@ export default function CreateReelButton() {
                 disabled={isPending}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {CLAUDE_MODELS.find((m) => m.value === model)?.label}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {CLAUDE_MODELS.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {claudeModelLabel(m)}
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -140,6 +165,28 @@ export default function CreateReelButton() {
               </Select>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Voice</label>
+              <Select
+                value={ttsVoice}
+                onValueChange={(val) => setTtsVoice(val as TtsVoice)}
+                disabled={isPending}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {TTS_VOICES.find((v) => v.value === ttsVoice)?.label}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TTS_VOICES.map((v) => (
+                    <SelectItem key={v.value} value={v.value}>
+                      {v.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex items-center gap-2">
               <Checkbox
                 id="auto-publish"
@@ -147,7 +194,10 @@ export default function CreateReelButton() {
                 onCheckedChange={(v) => setAutoPublish(!!v)}
                 disabled={isPending}
               />
-              <Label htmlFor="auto-publish" className="text-sm font-normal cursor-pointer">
+              <Label
+                htmlFor="auto-publish"
+                className="text-sm font-normal cursor-pointer"
+              >
                 Auto-publish to TikTok when ready
               </Label>
             </div>

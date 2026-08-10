@@ -9,12 +9,14 @@ export const createPipeline = (
   topic: string,
   claudeModel: string,
   videoModel: string,
+  ttsVoice?: string,
 ) => {
   return Reels.create({
     userId,
     topic,
     claudeModel,
     videoModel,
+    ttsVoice: ttsVoice ?? "aoede",
     pipelineStatus: "queued",
   });
 };

@@ -53,8 +53,9 @@ export const initPipelineService = async (
   topic: string,
   model: string,
   videoModel: VideoModel,
+  ttsVoice?: string,
 ) => {
-  return await createPipeline(userId, topic, model, videoModel);
+  return await createPipeline(userId, topic, model, videoModel, ttsVoice);
 };
 
 export const createPipelineService = async (
@@ -64,6 +65,7 @@ export const createPipelineService = async (
   model: string,
   videoModel: VideoModel,
   autoPublish = false,
+  ttsVoice = "aoede",
 ) => {
   console.log(
     `[pipeline:${pipelineId}] starting pipeline for topic: "${topic}" with model: ${model}`,
@@ -143,7 +145,7 @@ export const createPipelineService = async (
   console.log(`[pipeline:${pipelineId}] video spec saved`);
 
   console.log(`[pipeline:${pipelineId}] generating audio...`);
-  const soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
+  const soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId, ttsVoice);
   await saveAudioSpec(pipelineId, userId, soundSpec);
   await addCost(
     calculateTtsCost(
@@ -371,6 +373,7 @@ export const resumePipelineService = async (
   const topic = pipeline.topic;
   const model = pipeline.claudeModel;
   const videoModel = pipeline.videoModel as VideoModel;
+  const ttsVoice = pipeline.ttsVoice ?? "aoede";
   const resumeIndex = STAGE_ORDER.indexOf(resumeFrom);
 
   console.log(
@@ -454,7 +457,7 @@ export const resumePipelineService = async (
 
   if (resumeIndex < 5) {
     console.log(`[pipeline:${pipelineId}] generating audio...`);
-    soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
+    soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId, ttsVoice);
     await saveAudioSpec(pipelineId, userId, soundSpec);
     await addCost(
       calculateTtsCost(
@@ -470,7 +473,7 @@ export const resumePipelineService = async (
       console.log(
         `[pipeline:${pipelineId}] audio file missing, regenerating...`,
       );
-      soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId);
+      soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId, ttsVoice);
       await saveAudioSpec(pipelineId, userId, soundSpec);
       await addCost(
         calculateTtsCost(

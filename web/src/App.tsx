@@ -3,7 +3,6 @@ import Dashboard from "./pages/Dashboard";
 import Library from "./pages/Library";
 import Analytics from "./pages/Analytics";
 import Connections from "./pages/Connections";
-import Settings from "./pages/Settings";
 import PipelineDetail from "./pages/PipelineDetail";
 import Landing from "./pages/Landing";
 import TermsOfService from "./pages/TermsOfService";
@@ -28,8 +27,10 @@ function App() {
             <Route path="/library" element={<Library />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/connections" element={<Connections />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/dashboard/pipeline/:id" element={<PipelineDetail />} />
+            <Route
+              path="/dashboard/pipeline/:id"
+              element={<PipelineDetail />}
+            />
           </Route>
         </Route>
         <Route path="*" element={<NotFound />} />
