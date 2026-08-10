@@ -3,7 +3,9 @@ import Reels from "../models/reels.model";
 
 export const setupAnalyticsScheduler = async () => {
   const existing = await analyticsQueue.getRepeatableJobs();
-  await Promise.all(existing.map((j) => analyticsQueue.removeRepeatableByKey(j.key)));
+  await Promise.all(
+    existing.map((j) => analyticsQueue.removeRepeatableByKey(j.key)),
+  );
 
   await analyticsQueue.add(
     "weekly-analytics",
@@ -27,7 +29,9 @@ export const runAnalyticsFanout = async () => {
   }
 
   const userIds = rows.map((r) => r.userId as string);
-  console.log(`[analytics:fanout] enqueueing jobs for ${userIds.length} user(s): ${userIds.join(", ")}`);
+  console.log(
+    `[analytics:fanout] enqueueing jobs for ${userIds.length} user(s): ${userIds.join(", ")}`,
+  );
   await Promise.all(userIds.map(enqueueAnalyticsJob));
   console.log(`[analytics:fanout] all jobs enqueued ✓`);
 };

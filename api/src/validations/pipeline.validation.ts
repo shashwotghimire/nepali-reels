@@ -4,7 +4,7 @@ import { CLAUDE_MODELS, VIDEO_MODELS } from "../constants/constant";
 const claudeModelValues = Object.values(CLAUDE_MODELS) as [string, ...string[]];
 const videoModelValues = Object.values(VIDEO_MODELS) as [string, ...string[]];
 
-export const TTS_VOICES = ["aoede", "fenrir", "puck", "zephyr", "kore", "charon"] as const;
+export const TTS_VOICES = ["aoede", "fenrir", "puck", "zephyr", "kore", "charon", "callirrhoe"] as const;
 export type TtsVoice = typeof TTS_VOICES[number];
 
 export const getPipelineByIdSchema = z.object({

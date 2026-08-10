@@ -1,18 +1,22 @@
 import { useGetLatestAnalytics } from "@/hooks/api/useAnalytics";
 import { MetricCard } from "@/components/analytics/MetricCard";
-import { AnalyticsSummary } from "@/components/analytics/AnalyticsSummary";
-import { TopicsPerformance } from "@/components/analytics/TopicsPerformance";
-import { HooksAndGaps } from "@/components/analytics/HooksAndGaps";
-import { ReelPerformanceTable } from "@/components/analytics/ReelPerformanceTable";
-import { SuggestedTopics } from "@/components/analytics/SuggestedTopics";
-import { ExperimentsCard } from "@/components/analytics/ExperimentsCard";
+import { AnalyticsOverview } from "@/components/analytics/AnalyticsOverview";
+import { AnalyticsInsightsTabs } from "@/components/analytics/AnalyticsInsightsTabs";
 import { AnalyticsSkeleton } from "@/components/analytics/AnalyticsSkeleton";
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+      {children}
+    </h2>
+  );
+}
 
 function Analytics() {
   const { data, isLoading, error } = useGetLatestAnalytics();
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-5">
+    <div className="p-6 max-w-6xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">Analytics</h1>
         <p className="text-muted-foreground text-sm mt-1">
@@ -36,19 +40,24 @@ function Analytics() {
 
       {data && !Array.isArray(data.suggestions) && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MetricCard label="Avg Engagement" value={`${(data.report.avg_engagement_rate * 100).toFixed(1)}%`} />
-            <MetricCard label="Reels Tracked" value={data.report.reels.length} />
-            <MetricCard label="Report Date" value={new Date(data.fetchedAt).toLocaleDateString()} />
-            <MetricCard label="Suggested Topics" value={data.suggestions.suggestedTopics.length} />
-          </div>
+          <section>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <MetricCard label="Avg Engagement" value={`${(data.report.avg_engagement_rate * 100).toFixed(1)}%`} />
+              <MetricCard label="Reels Tracked" value={data.report.reels.length} />
+              <MetricCard label="Report Date" value={new Date(data.fetchedAt).toLocaleDateString()} />
+              <MetricCard label="Suggested Topics" value={data.suggestions.suggestedTopics.length} />
+            </div>
+          </section>
 
-          <AnalyticsSummary summary={data.suggestions.summary} />
-          <SuggestedTopics topics={data.suggestions.suggestedTopics} />
-          <HooksAndGaps bestHooks={data.suggestions.bestHooks} contentGaps={data.suggestions.contentGaps} />
-          <TopicsPerformance bestTopics={data.suggestions.bestTopics} worstTopics={data.suggestions.worstTopics} />
-          <ReelPerformanceTable reels={data.report.reels} topPerformerId={data.report.top_performer_id} />
-          <ExperimentsCard experiments={data.suggestions.experiments} />
+          <section>
+            <SectionLabel>Performance Overview</SectionLabel>
+            <AnalyticsOverview data={data} suggestions={data.suggestions} />
+          </section>
+
+          <section>
+            <SectionLabel>Insights & Strategy</SectionLabel>
+            <AnalyticsInsightsTabs suggestions={data.suggestions} />
+          </section>
         </>
       )}
     </div>

@@ -42,9 +42,9 @@ const CLAUDE_MODELS: { value: ClaudeModel; label: string }[] = [
 ];
 
 const VIDEO_MODELS: { value: VideoModel; label: string }[] = [
-  { value: "bytedance/seedance-1-5-pro", label: "Seedance 1.5 Pro" },
-  { value: "alibaba/wan-2.6", label: "Wan 2.6" },
-  { value: "x-ai/grok-imagine-video", label: "Grok Imagine Video" },
+  { value: "bytedance/seedance-1-5-pro", label: "ByteDance Seedance-1.5-Pro" },
+  { value: "alibaba/wan-2.6", label: "Alibaba Wan-2.6" },
+  { value: "x-ai/grok-imagine-video", label: "xAI Grok-Imagine-Video" },
 ];
 
 const DEFAULT_MODEL: ClaudeModel =
@@ -58,6 +58,7 @@ const TTS_VOICES: { value: TtsVoice; label: string }[] = [
   { value: "zephyr", label: "Zephyr — female, bright, higher pitch" },
   { value: "kore", label: "Kore — female, firm, middle pitch" },
   { value: "charon", label: "Charon — male, informative, lower pitch" },
+  { value: "callirrhoe", label: "Callirrhoe — female, easy going, middle pitch" },
 ];
 
 const DEFAULT_TTS_VOICE: TtsVoice = "aoede";

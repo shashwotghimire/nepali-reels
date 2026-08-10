@@ -97,7 +97,7 @@ export type ClaudeModel =
 export type VideoModel =
   "bytedance/seedance-1-5-pro" | "alibaba/wan-2.6" | "x-ai/grok-imagine-video";
 
-export type TtsVoice = "aoede" | "fenrir" | "puck" | "zephyr" | "kore" | "charon";
+export type TtsVoice = "aoede" | "fenrir" | "puck" | "zephyr" | "kore" | "charon" | "callirrhoe";
 
 export interface GenerateScriptRequest {
   topic: string;
