@@ -45,6 +45,7 @@ const VIDEO_MODELS: { value: VideoModel; label: string }[] = [
   { value: "bytedance/seedance-1-5-pro", label: "ByteDance Seedance-1.5-Pro" },
   { value: "alibaba/wan-2.6", label: "Alibaba Wan-2.6" },
   { value: "x-ai/grok-imagine-video", label: "xAI Grok-Imagine-Video" },
+  { value: "bytedance/seedance-2.0-mini", label: "ByteDance Seedance-2.0-Mini" },
 ];
 
 const DEFAULT_MODEL: ClaudeModel =

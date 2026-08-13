@@ -29,6 +29,7 @@ export const VIDEO_MODELS = {
   "Seedance 1.5 Pro": "bytedance/seedance-1-5-pro",
   "Wan 2.6": "alibaba/wan-2.6",
   "Grok Imagine Video": "x-ai/grok-imagine-video",
+  "Seedance 2.0 Mini": "bytedance/seedance-2.0-mini",
 } as const;
 
 export type VideoModel = (typeof VIDEO_MODELS)[keyof typeof VIDEO_MODELS];
@@ -100,6 +101,9 @@ export const VIDEO_GENERATION_PRICING = {
   },
   "x-ai/grok-imagine-video": {
     perSecond: 0.05,
+  },
+  "bytedance/seedance-2.0-mini": {
+    perSecond: 0.01153,
   },
 } as const;
 
