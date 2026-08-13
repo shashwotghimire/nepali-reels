@@ -96,23 +96,6 @@ function ScriptSection({
           </div>
         </div>
 
-        {script.onScreenText.length > 0 && (
-          <div className="p-4 space-y-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">
-              On-screen text
-            </p>
-            <div className="space-y-1">
-              {script.onScreenText.map((o, i) => (
-                <div key={i} className="flex gap-3 text-sm">
-                  <span className="text-muted-foreground shrink-0 tabular-nums">
-                    {o.atSec}s
-                  </span>
-                  <span>{o.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="p-4 space-y-2">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
