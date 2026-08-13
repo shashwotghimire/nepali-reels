@@ -95,7 +95,7 @@ export type ClaudeModel =
   | "global.anthropic.claude-opus-4-6-v1";
 
 export type VideoModel =
-  "bytedance/seedance-1-5-pro" | "alibaba/wan-2.6" | "x-ai/grok-imagine-video";
+  "bytedance/seedance-1-5-pro" | "alibaba/wan-2.6" | "x-ai/grok-imagine-video" | "bytedance/seedance-2.0-mini";
 
 export type TtsVoice = "aoede" | "fenrir" | "puck" | "zephyr" | "kore" | "charon" | "callirrhoe";
 

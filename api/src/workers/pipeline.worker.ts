@@ -15,6 +15,7 @@ export const pipelineWorker = new Worker(
   },
   {
     connection,
+    lockDuration: 25 * 60 * 1000, // 25 min — pipeline can take ~15 min in prod
   },
 );
 
