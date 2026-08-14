@@ -253,6 +253,23 @@
   letter-spacing: -0.02em;
 }
 .lnd-nav-brand img { border-radius: var(--lnd-radius-sm); width: 28px; height: 28px; }
+.lnd-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.lnd-nav-icon {
+  color: var(--lnd-ink);
+  text-decoration: none;
+  font-family: var(--lnd-font-display);
+  font-weight: 700;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.8;
+  transition: opacity 150ms;
+}
+.lnd-nav-icon:hover { opacity: 1; }
 .lnd-nav-cta {
   background: var(--lnd-ink);
   color: var(--lnd-paper);
