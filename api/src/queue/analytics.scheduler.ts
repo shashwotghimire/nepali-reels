@@ -10,10 +10,10 @@ export const setupAnalyticsScheduler = async () => {
   await analyticsQueue.add(
     "weekly-analytics",
     {},
-    { repeat: { pattern: "0 9 * * 1" }, removeOnComplete: true },
+    { repeat: { pattern: "0 9 1 1 *" }, removeOnComplete: true },
   );
 
-  console.log("[analytics] scheduler registered — Mondays 9am UTC (0 9 * * 1)");
+  console.log("[analytics] scheduler registered — Jan 1st 9am UTC (0 9 1 1 *)");
 };
 
 export const runAnalyticsFanout = async () => {
