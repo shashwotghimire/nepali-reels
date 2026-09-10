@@ -6,44 +6,7 @@ AI pipeline that turns a topic into a published Nepali short-form video on TikTo
 
 ## Architecture
 
-```
-User (web)
-    │
-    │  POST /api/pipeline/generate-script
-    ▼
-┌─────────────┐        ┌───────────────────────────────────────────────────────┐
-│  API Server │──────▶ │                   BullMQ (Redis)                      │
-│  Express 5  │  202   │                                                       │
-└─────────────┘        │  ┌─────────────────────────────────────────────────┐  │
-                        │  │               Pipeline Worker                   │  │
-                        │  │                                                 │  │
-                        │  │  1. ScriptWriter    Claude + Tavily search      │  │
-                        │  │  2. FactChecker     Claude + Tavily (auto-fix)  │  │
-                        │  │  3. LinguisticExpert Claude (Nepali review)     │  │
-                        │  │  4. VideoSpec       Claude → scene breakdown    │  │
-                        │  │  5. TTS             Gemini 2.5 → WAV            │  │
-                        │  │  6. Alignment       ElevenLabs → word timestamps│  │
-                        │  │  7. VideoGen        OpenRouter → scene MP4s     │  │
-                        │  │  8. Thumbnail       OpenRouter image gen        │  │
-                        │  │  9. Composite       skia-canvas + FFmpeg        │  │
-                        │  │ 10. S3 Upload       video + thumbnail           │  │
-                        │  │ 11. Email           reel-ready notification     │  │
-                        │  │ 12. TikTok Publish  PULL_FROM_URL → poll        │  │
-                        │  └─────────────────────────────────────────────────┘  │
-                        │                                                       │
-                        │  ┌──────────────┐  ┌────────────┐  ┌──────────────┐  │
-                        │  │ TikTok Worker│  │Email Worker│  │Analytics     │  │
-                        │  │ (poll status)│  │(Resend SMTP│  │Worker (cron) │  │
-                        │  └──────────────┘  └────────────┘  └──────────────┘  │
-                        └───────────────────────────────────────────────────────┘
-                                           │
-                              ┌────────────┴─────────────┐
-                              │                          │
-                        ┌─────▼──────┐           ┌──────▼──────┐
-                        │ PostgreSQL │           │  AWS S3 +   │
-                        │  (Neon)    │           │ CloudFront  │
-                        └────────────┘           └─────────────┘
-```
+![Nepali Reels pipeline architecture](docs/images/pipeline-architecture.png)
 
 ---
 
