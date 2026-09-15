@@ -12,4 +12,5 @@ export default client;
 
 export const gClient = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
+  httpOptions: { retryOptions: { attempts: 1 } },
 });

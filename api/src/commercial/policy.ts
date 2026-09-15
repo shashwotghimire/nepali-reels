@@ -73,15 +73,17 @@ export const STANDARD_GENERATION = {
 } as const satisfies StandardGenerationConfig;
 
 export interface CostBudgetPolicy {
-  /** Advisory only: no atomic reservation or hard provider pre-call stop exists yet. */
-  readonly enforcement: "inactive";
+  /** Atomic measurable-resource reservations; this is not a currency guarantee. */
+  readonly enforcement: "resource_reservations";
   readonly currency: "NPR";
   readonly nprPerUsd: number;
   readonly perVideoTargetNpr: Readonly<Record<"creator" | "plus", number>>;
   readonly aggregatePlanningCeilings: {
+    readonly providerCalls: number;
     /** Across every LLM call for one video, including fact checks and AI revisions. */
     readonly llmInputTokens: number;
     readonly llmOutputTokens: number;
+    readonly researchSearches: number;
     /** Across all scene-generation requests, including retries and regenerations. */
     readonly generatedVideoSeconds: number;
   };
@@ -99,15 +101,17 @@ export interface CostBudgetPolicy {
   )[];
 }
 
-/** Illustrative aggregate budget assumptions, not a hard cost guarantee or pre-call guard. */
+/** Aggregate resource limits. Prices remain planning assumptions, not a hard cost guarantee. */
 export const COST_BUDGET_POLICY = {
-  enforcement: "inactive",
+  enforcement: "resource_reservations",
   currency: "NPR",
   nprPerUsd: 160,
   perVideoTargetNpr: { creator: 375, plus: 425 },
   aggregatePlanningCeilings: {
+    providerCalls: 90,
     llmInputTokens: 60_000,
     llmOutputTokens: 20_000,
+    researchSearches: 45,
     generatedVideoSeconds: STANDARD_GENERATION.maxGeneratedVideoSeconds,
   },
   retryReserveFraction: 0.25,

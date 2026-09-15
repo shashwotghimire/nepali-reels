@@ -78,13 +78,14 @@ Three Docker containers:
 
 ## Pipeline Stages
 
-Each stage saves its output as JSONB on the `reels` row. A failed pipeline can be retried — it resumes from the last saved checkpoint.
+The existing workflow is versioned as `explainer` v1. Business outputs remain on the `reels` row for API compatibility, while stage attempts, leases, replay outputs, budget reservations, and durable media artifacts have dedicated tables. Create and retry jobs use the same dispatcher. A retry reuses successful checkpoints and completed scene artifacts.
 
 ```
-queued → script_generated → script_finalised → linguistic_reviewed
-       → video_spec_generated → sound_generated → video_generated
-       → publish_pending → published   (or → failed at any stage)
+script → fact_check → linguistic_review → video_spec → audio → alignment
+       → video scenes → thumbnail → render → upload → notify → publish
 ```
+
+Provider resource budgets are reserved before calls and include in-flight work. Missing usage retains reserved capacity. These limits do not represent a guaranteed USD spend while prices or provider usage remain unknown.
 
 Subtitle rendering uses skia-canvas instead of FFmpeg's `drawtext` for correct Devanagari glyph shaping. Caption timings are proportionally scaled from ElevenLabs word timestamps to match actual TTS audio duration.
 

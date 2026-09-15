@@ -19,6 +19,8 @@ export class Reels extends Model<
   declare topic: string;
   declare claudeModel: string;
   declare videoModel: string;
+  declare videoType: CreationOptional<"explainer">;
+  declare workflowVersion: CreationOptional<number>;
   declare draftScript: CreationOptional<object | null>;
   declare finalScript: CreationOptional<object | null>;
   declare videoSpec: CreationOptional<object | null>;
@@ -62,6 +64,16 @@ Reels.init(
     videoModel: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    videoType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "explainer",
+    },
+    workflowVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
     },
     draftScript: {
       type: DataTypes.JSONB,

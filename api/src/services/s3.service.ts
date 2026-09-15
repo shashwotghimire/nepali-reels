@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
+import path from "path";
 
 export const s3 = new S3Client({
   region: process.env.AWS_S3_REGION!,
@@ -71,4 +72,30 @@ export const deleteFromS3 = async (key: string) => {
     }),
   );
   return data;
+};
+
+export const uploadWorkflowFile = async (
+  filePath: string,
+  key: string,
+  contentType: string,
+) => {
+  const stat = await fs.promises.stat(filePath);
+  await s3.send(new PutObjectCommand({
+    Bucket: process.env.AWS_S3_BUCKET!,
+    Key: key,
+    Body: fs.createReadStream(filePath),
+    ContentType: contentType,
+  }));
+  return { key, byteSize: stat.size };
+};
+
+export const downloadWorkflowFile = async (key: string, destination: string) => {
+  const response = await s3.send(new GetObjectCommand({
+    Bucket: process.env.AWS_S3_BUCKET!,
+    Key: key,
+  }));
+  if (!response.Body) throw new Error(`S3 workflow artifact ${key} has no body`);
+  await fs.promises.mkdir(path.dirname(destination), { recursive: true });
+  await fs.promises.writeFile(destination, Buffer.from(await response.Body.transformToByteArray()));
+  return destination;
 };

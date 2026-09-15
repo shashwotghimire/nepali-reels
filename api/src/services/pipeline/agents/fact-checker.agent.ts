@@ -11,6 +11,8 @@ import { accumulateLlmUsage } from "../../../utils/cost.util";
 import type { AgentResult, LlmUsage } from "../../../types/usage.types";
 import { meteredAnthropicCall, meteredTavilySearch, type MeteringContext } from "../llm-metering";
 import { extractLlmUsage } from "../../../helpers/usage.helper";
+import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
+import { providerCallBudget } from "../budget-policy.service";
 
 export const factCheckerAgent = async (
   script: ScriptOutput,
@@ -36,7 +38,10 @@ export const factCheckerAgent = async (
         format: zodOutputFormat(FactCheckOutputSchema),
       },
       messages,
-    }, { maxRetries: 0 }));
+    }, { maxRetries: 0 }), providerCallBudget({
+      inputTokens: estimateInputTokenReservation(factCheckerPrompt(today), messages, tavliySearchTool),
+      outputTokens: 8_192,
+    }));
 
     usages.push(extractLlmUsage(response));
 

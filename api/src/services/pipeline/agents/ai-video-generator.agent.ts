@@ -10,9 +10,25 @@ import {
   AI_VIDEO_DURATION_TOLERANCE,
   type VideoModel,
 } from "../../../constants/constant";
-import { randomUUID } from "crypto";
 import { beginProviderAttempt, finishProviderAttempt } from "../../../repositories/provider-usage.repository";
 import { calculateVideoCost } from "../../../utils/cost.util";
+import type { MeteringContext } from "../llm-metering";
+import {
+  ProviderJobFailedError,
+  generateVideoScene,
+  type VideoSceneJobState,
+} from "../video-scene-generation.service";
+import {
+  getWorkflowArtifactDetails,
+  persistInlineWorkflowArtifact,
+  persistWorkflowFile,
+  restoreWorkflowFile,
+} from "../workflow-artifact.service";
+import {
+  stableFingerprint,
+  workflowArtifactKey,
+} from "../../../helpers/workflow-artifact.helper";
+import { EXPLAINER_WORKFLOW_VERSION } from "../../../helpers/workflow.helper";
 
 const execFileAsync = promisify(execFile);
 
@@ -71,7 +87,7 @@ async function pollJobUntilDone(jobId: string): Promise<string> {
     }
 
     if (result.status === "failed") {
-      throw new Error(
+      throw new ProviderJobFailedError(
         `[ai-video] job ${jobId} failed: ${(result as { error?: string }).error ?? "no error detail"}`,
       );
     }
@@ -263,8 +279,11 @@ export async function generateAiVideoClips(
   scenes: Scene[],
   pipelineId: string,
   videoModel: VideoModel,
-  context?: { userId: string; pipelineId: string; stage: string },
+  context?: MeteringContext,
 ): Promise<string> {
+  if (!context?.budget) {
+    throw new Error("AI video generation requires a trusted provider budget context");
+  }
   const model = videoModel;
 
   const pipelineDir = path.join("src/video", pipelineId);
@@ -274,34 +293,154 @@ export async function generateAiVideoClips(
 
   // Submit and poll in batches of 2 — only start the next batch after the previous completes
   const BATCH_SIZE = 2;
-  const jobIds: string[] = [];
-  const videoUrls: string[] = [];
+  const normalizedPaths: string[] = [];
 
   for (let b = 0; b < scenes.length; b += BATCH_SIZE) {
     const batch = scenes.slice(b, b + BATCH_SIZE);
     console.log(
       `[ai-video:${pipelineId}] submitting batch ${Math.floor(b / BATCH_SIZE) + 1} (scenes ${b}–${b + batch.length - 1})...`,
     );
-    const settled = await Promise.allSettled(batch.map(async (scene) => {
-      const attemptId = randomUUID();
+    const settled = await Promise.allSettled(batch.map(async (scene, batchIndex) => {
+      const sceneIndex = b + batchIndex;
       const requestedSeconds = Math.round(scene.endSec - scene.startSec);
-      if (context) await beginProviderAttempt({ attemptId, userId: context.userId,
-        pipelineId: context.pipelineId, operation: "video_generation", stage: context.stage,
-        provider: "openrouter", model,
-        configuration: { duration: requestedSeconds, aspectRatio: "9:16", resolution: "480p", generateAudio: false } });
-      try {
-        const jobId = await submitSceneJob(scene, model);
-        const url = await pollJobUntilDone(jobId);
-        if (context) await finishProviderAttempt({ attemptId, status: "succeeded",
-          usage: { generatedVideoSeconds: requestedSeconds },
-          costUsd: calculateVideoCost(requestedSeconds, videoModel).toString(),
-          costProvenance: "estimated", rateVersion: "planning-2026-09-14" });
-        return { jobId, url };
-      } catch (error) {
-        if (context) await finishProviderAttempt({ attemptId, status: "failed",
-          costUsd: null, costProvenance: "unknown", error: String(error) });
-        throw error;
-      }
+      const fingerprint = stableFingerprint({
+        scene,
+        model,
+        aspectRatio: "9:16",
+        resolution: "480p",
+        generateAudio: false,
+      });
+      const stateKey = workflowArtifactKey(
+        EXPLAINER_WORKFLOW_VERSION,
+        "video-scene-state",
+        String(sceneIndex),
+      );
+      const clipKey = workflowArtifactKey(
+        EXPLAINER_WORKFLOW_VERSION,
+        "video-scene",
+        String(sceneIndex),
+      );
+      const normPath = path.join(pipelineDir, `clip-${sceneIndex}.mp4`);
+
+      return generateVideoScene({
+        scene,
+        model,
+        fingerprint,
+        budget: context.budget!,
+        store: {
+          async load() {
+            const artifact = await getWorkflowArtifactDetails({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: stateKey,
+            });
+            return artifact?.fingerprint === fingerprint
+              ? artifact.metadata as VideoSceneJobState | null
+              : null;
+          },
+          async save(state) {
+            await persistInlineWorkflowArtifact({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: stateKey,
+              kind: "video_scene_state",
+              fingerprint,
+              metadata: state,
+            });
+          },
+          async restoreCompleted() {
+            return await restoreWorkflowFile({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: clipKey,
+              destination: normPath,
+              fingerprint,
+            }) ? normPath : null;
+          },
+          async persistCompleted(localPath, state) {
+            await persistWorkflowFile({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: clipKey,
+              kind: "video_scene",
+              filePath: localPath,
+              extension: "mp4",
+              contentType: "video/mp4",
+              fingerprint,
+              metadata: {
+                providerJobId: state.providerJobId,
+                providerAttemptId: state.providerAttemptId,
+                attemptNumber: state.attemptNumber,
+              },
+            });
+            return clipKey;
+          },
+        },
+        provider: {
+          submit: submitSceneJob,
+          async waitForCompletion(jobId) {
+            await pollJobUntilDone(jobId);
+          },
+          async materialize(jobId) {
+            const rawPath = path.join(pipelineDir, `clip-${sceneIndex}-raw.mp4`);
+            await downloadClip(jobId, rawPath);
+            await validateClipWithFfprobe(rawPath);
+            await normalizeClip(rawPath, normPath, scene.endSec - scene.startSec);
+            await fs.promises.unlink(rawPath).catch(() => {});
+            return normPath;
+          },
+        },
+        usage: {
+          async begin({ attemptId, attemptNumber }) {
+            await beginProviderAttempt({
+              attemptId,
+              userId: context.userId,
+              pipelineId: context.pipelineId,
+              operation: "video_generation",
+              stage: context.stage,
+              provider: "openrouter",
+              model,
+              configuration: {
+                duration: requestedSeconds,
+                aspectRatio: "9:16",
+                resolution: "480p",
+                generateAudio: false,
+                sceneIndex,
+                attempt: attemptNumber,
+              },
+            });
+          },
+          async cancelBeforeStart({ attemptId, error }) {
+            await finishProviderAttempt({
+              attemptId,
+              status: "failed",
+              usage: { generatedVideoSeconds: 0 },
+              costUsd: 0,
+              costProvenance: "actual",
+              error,
+            });
+          },
+          async succeed({ attemptId, generatedSeconds }) {
+            await finishProviderAttempt({
+              attemptId,
+              status: "succeeded",
+              usage: { generatedVideoSeconds: generatedSeconds },
+              costUsd: calculateVideoCost(generatedSeconds, videoModel).toString(),
+              costProvenance: "estimated",
+              rateVersion: "planning-2026-09-14",
+            });
+          },
+          async fail({ attemptId, error }) {
+            await finishProviderAttempt({
+              attemptId,
+              status: "failed",
+              costUsd: null,
+              costProvenance: "unknown",
+              error,
+            });
+          },
+        },
+      });
     }));
     const failed = settled.find((result) => result.status === "rejected");
     if (failed?.status === "rejected") throw failed.reason;
@@ -309,33 +448,7 @@ export async function generateAiVideoClips(
       if (result.status !== "fulfilled") throw result.reason;
       return result.value;
     });
-    jobIds.push(...batchResults.map((result) => result.jobId));
-    videoUrls.push(...batchResults.map((result) => result.url));
-  }
-
-  const normalizedPaths: string[] = [];
-
-  for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i]!;
-    const jobId = jobIds[i]!;
-    const rawPath = path.join(pipelineDir, `clip-${i}-raw.mp4`);
-    const normPath = path.join(pipelineDir, `clip-${i}.mp4`);
-    const sceneDuration = scene.endSec - scene.startSec;
-
-    // videoUrls[i] is kept in case we need the URL for logging; download via SDK stream
-    console.log(
-      `[ai-video:${pipelineId}] downloading clip ${i} (url=${videoUrls[i]})...`,
-    );
-    await downloadClip(jobId, rawPath);
-
-    console.log(`[ai-video:${pipelineId}] validating clip ${i}...`);
-    await validateClipWithFfprobe(rawPath);
-
-    console.log(`[ai-video:${pipelineId}] normalizing clip ${i}...`);
-    await normalizeClip(rawPath, normPath, sceneDuration);
-
-    await fs.promises.unlink(rawPath).catch(() => {});
-    normalizedPaths.push(normPath);
+    normalizedPaths.push(...batchResults);
   }
 
   console.log(

@@ -4,6 +4,8 @@ import { analyticsPrompt } from "../../../llm/analytics.prompt";
 import { AnalyticsReportSchema, type AnalyticsReport } from "../../../schema/analytics.schema";
 import type { TikTokVideoInsight } from "../../../models/analytics.model";
 import { meteredAnthropicCall, type MeteringContext } from "../llm-metering";
+import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
+import { providerCallBudget } from "../budget-policy.service";
 
 export const analyticsAgent = async (
   rawData: TikTokVideoInsight[],
@@ -24,7 +26,10 @@ export const analyticsAgent = async (
           content: JSON.stringify(rawData),
         },
       ],
-    }, { maxRetries: 0 }));
+    }, { maxRetries: 0 }), providerCallBudget({
+      inputTokens: estimateInputTokenReservation(analyticsPrompt, rawData),
+      outputTokens: 8_192,
+    }));
 
     if (!response.parsed_output) {
       throw new Error("Analytics agent returned null output");

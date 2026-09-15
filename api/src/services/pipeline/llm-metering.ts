@@ -9,11 +9,15 @@ import {
   beginProviderAttempt,
   finishProviderAttempt,
 } from "../../repositories/provider-usage.repository";
+import type { BudgetAmounts } from "../../helpers/phase2-budget.helper";
+import type { ProviderBudgetContext } from "./provider-budget.service";
+import { providerCallBudget } from "./budget-policy.service";
 
 export interface MeteringContext {
   userId: string;
   pipelineId: string;
   stage: string;
+  budget?: ProviderBudgetContext;
 }
 
 const errorMessage = (error: unknown): string =>
@@ -38,24 +42,33 @@ export async function meteredAnthropicCall<T extends AnthropicUsageResponse>(
   operation: string,
   model: string,
   invoke: () => Promise<T>,
+  requestedBudget?: BudgetAmounts,
 ): Promise<T> {
   let previousAttemptId: string | undefined;
 
   // Match the SDK's default of two retries, with each attempt represented in the ledger.
   for (let attempt = 0; attempt < 3; attempt++) {
     const attemptId = randomUUID();
+    const budgetReservation = inputBudget(context, requestedBudget)
+      ? await context!.budget!.reserve(attemptId, attempt + 1, requestedBudget!)
+      : undefined;
     if (context) {
-      await beginProviderAttempt({
-        attemptId,
-        userId: context.userId,
-        pipelineId: context.pipelineId,
-        operation,
-        stage: context.stage,
-        provider: "aws-bedrock",
-        model,
-        configuration: { api: "anthropic.messages.parse", attempt: attempt + 1 },
-        ...(previousAttemptId ? { retryOfAttemptId: previousAttemptId } : {}),
-      });
+      try {
+        await beginProviderAttempt({
+          attemptId,
+          userId: context.userId,
+          pipelineId: context.pipelineId,
+          operation,
+          stage: context.stage,
+          provider: "aws-bedrock",
+          model,
+          configuration: { api: "anthropic.messages.parse", attempt: attempt + 1 },
+          ...(previousAttemptId ? { retryOfAttemptId: previousAttemptId } : {}),
+        });
+      } catch (error) {
+        if (budgetReservation) await context.budget!.releaseBeforeStart(budgetReservation);
+        throw error;
+      }
     }
 
     let response: T;
@@ -70,6 +83,13 @@ export async function meteredAnthropicCall<T extends AnthropicUsageResponse>(
           costUsd: null,
           costProvenance: "unknown",
           error: errorMessage(error),
+        });
+      }
+      if (budgetReservation) {
+        await context!.budget!.finalize(budgetReservation, {
+          providerCalls: 1,
+          inputTokens: null,
+          outputTokens: null,
         });
       }
       if (!willRetry) throw error;
@@ -91,10 +111,24 @@ export async function meteredAnthropicCall<T extends AnthropicUsageResponse>(
         costProvenance: hasRate ? "estimated" : "unknown",
         rateVersion: hasRate ? "llm-pricing-2026-09-14" : null,
       });
+      if (budgetReservation) {
+        await context.budget!.finalize(budgetReservation, {
+          providerCalls: 1,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+        });
+      }
     }
     return response;
   }
   throw new Error("Anthropic retry loop exhausted");
+}
+
+function inputBudget(
+  context: MeteringContext | undefined,
+  requested: BudgetAmounts | undefined,
+): boolean {
+  return Boolean(context?.budget && requested);
 }
 
 export async function meteredTavilySearch<T>(
@@ -104,7 +138,14 @@ export async function meteredTavilySearch<T>(
 ): Promise<T> {
   if (!context) return search();
   const attemptId = randomUUID();
-  await beginProviderAttempt({
+  const requested = context.budget
+    ? providerCallBudget({ searches: 1 })
+    : undefined;
+  const budgetReservation = requested
+    ? await context.budget!.reserve(attemptId, 1, requested)
+    : undefined;
+  try {
+    await beginProviderAttempt({
     attemptId,
     userId: context.userId,
     pipelineId: context.pipelineId,
@@ -113,7 +154,11 @@ export async function meteredTavilySearch<T>(
     provider: "tavily",
     model: null,
     configuration: { searchDepth: "basic", maxResults: 5, query },
-  });
+    });
+  } catch (error) {
+    if (budgetReservation) await context.budget!.releaseBeforeStart(budgetReservation);
+    throw error;
+  }
   let result: T;
   try {
     result = await search();
@@ -125,6 +170,12 @@ export async function meteredTavilySearch<T>(
       costProvenance: "unknown",
       error: errorMessage(error),
     });
+    if (budgetReservation) {
+      await context.budget!.finalize(budgetReservation, {
+        providerCalls: 1,
+        searches: 1,
+      });
+    }
     throw error;
   }
   await finishProviderAttempt({
@@ -133,5 +184,11 @@ export async function meteredTavilySearch<T>(
     costUsd: null,
     costProvenance: "unknown",
   });
+  if (budgetReservation) {
+    await context.budget!.finalize(budgetReservation, {
+      providerCalls: 1,
+      searches: 1,
+    });
+  }
   return result;
 }

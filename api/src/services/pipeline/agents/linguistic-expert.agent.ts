@@ -11,6 +11,8 @@ import { accumulateLlmUsage } from "../../../utils/cost.util";
 import type { AgentResult, LlmUsage } from "../../../types/usage.types";
 import { meteredAnthropicCall, meteredTavilySearch, type MeteringContext } from "../llm-metering";
 import { extractLlmUsage } from "../../../helpers/usage.helper";
+import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
+import { providerCallBudget } from "../budget-policy.service";
 
 export const linguisticExpertAgent = async (
   script: ScriptOutput,
@@ -35,7 +37,10 @@ export const linguisticExpertAgent = async (
         format: zodOutputFormat(LinguisticExpertOutputSchema),
       },
       messages,
-    }, { maxRetries: 0 }));
+    }, { maxRetries: 0 }), providerCallBudget({
+      inputTokens: estimateInputTokenReservation(linguisticExpertPrompt, messages, tavliySearchTool),
+      outputTokens: 8_192,
+    }));
 
     usages.push(extractLlmUsage(response));
 

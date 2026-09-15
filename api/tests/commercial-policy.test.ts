@@ -31,12 +31,14 @@ test("standard generation uses the configured provider models and aggregate plan
   assert.equal(STANDARD_GENERATION.maxGeneratedVideoSeconds, 90);
 });
 
-test("budget assumptions cover aggregate variable-cost work without activating enforcement", () => {
-  assert.equal(COST_BUDGET_POLICY.enforcement, "inactive");
+test("budget policy activates aggregate resource reservations without claiming a currency guarantee", () => {
+  assert.equal(COST_BUDGET_POLICY.enforcement, "resource_reservations");
   assert.deepEqual(COST_BUDGET_POLICY.perVideoTargetNpr, { creator: 375, plus: 425 });
   assert.deepEqual(COST_BUDGET_POLICY.aggregatePlanningCeilings, {
+    providerCalls: 90,
     llmInputTokens: 60_000,
     llmOutputTokens: 20_000,
+    researchSearches: 45,
     generatedVideoSeconds: 90,
   });
   assert.equal(COST_BUDGET_POLICY.retryReserveFraction, 0.25);

@@ -41,7 +41,9 @@ export const ScriptOutputSchema = z.object({
   titleOptions: z.array(z.string()).min(2),
   hashtags: z.array(z.string()).min(3),
   platformDescription: z.string(),
-  estDurationSec: z.number().min(50, "Script must be at least 50 seconds").max(70, "Script must not exceed 70 seconds"),
+  // The trusted entitlement-specific range is enforced by the workflow. This
+  // schema only enforces the physical range supported by three 4s shots.
+  estDurationSec: z.number().min(12, "Script must be at least 12 seconds").max(75, "Script must not exceed 75 seconds"),
 });
 
 export type ScriptOutput = z.infer<typeof ScriptOutputSchema>;

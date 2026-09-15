@@ -11,13 +11,21 @@ import type { AgentResult, LlmUsage } from "../../../types/usage.types";
 import type { ScriptOutput } from "../../../schema/script-writer.schema";
 import { meteredAnthropicCall, meteredTavilySearch, type MeteringContext } from "../llm-metering";
 import { extractLlmUsage } from "../../../helpers/usage.helper";
+import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
+import { providerCallBudget } from "../budget-policy.service";
 
 export const scriptGeneratorAgent = async (
   topic: string,
   model: string,
   context?: MeteringContext,
+  duration?: { targetDurationSeconds: number; maximumDurationSeconds: number },
 ): Promise<AgentResult<ScriptOutput>> => {
   const today = new Date().toISOString().split("T")[0] ?? "";
+  const prompt = scriptWriterPrompt(
+    today,
+    duration?.targetDurationSeconds,
+    duration?.maximumDurationSeconds,
+  );
   const messages: MessageParam[] = [{ role: "user", content: topic }];
   const usages: LlmUsage[] = [];
 
@@ -26,13 +34,16 @@ export const scriptGeneratorAgent = async (
       const response = await meteredAnthropicCall(context, "script-writer", model, () => client.messages.parse({
         model,
         max_tokens: 8192,
-        system: scriptWriterPrompt(today),
+        system: prompt,
         tools: [tavliySearchTool],
         output_config: {
           format: zodOutputFormat(ScriptOutputSchema),
         },
         messages,
-      }, { maxRetries: 0 }));
+      }, { maxRetries: 0 }), providerCallBudget({
+        inputTokens: estimateInputTokenReservation(prompt, messages, tavliySearchTool),
+        outputTokens: 8_192,
+      }));
 
       usages.push(extractLlmUsage(response));
 

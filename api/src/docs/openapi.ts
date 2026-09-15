@@ -575,6 +575,8 @@ export const openApiDocument = {
           topic: { type: "string" },
           claudeModel: { type: "string" },
           videoModel: { type: "string" },
+          videoType: { type: "string", enum: ["explainer"] },
+          workflowVersion: { type: "integer", minimum: 1 },
           draftScript: { type: ["object", "null"], description: "Script writer agent output" },
           finalScript: { type: ["object", "null"], description: "Finalised Nepali script" },
           videoSpec: { type: ["object", "null"], description: "Scene breakdown" },

@@ -1,17 +1,18 @@
 import { Worker } from "bullmq";
-import { createPipelineService, markPipelineAsFailedService, resumePipelineService } from "../services/pipeline/pipeline.service";
+import { dispatchPipelineService, markPipelineAsFailedService } from "../services/pipeline/pipeline.service";
 import { connection } from "../configs/redis.config";
 import { toUserFriendlyError } from "../utils/error-messages.js";
 
 export const pipelineWorker = new Worker(
   "pipeline",
   async (job) => {
-    const { userId, pipelineId, topic, model, videoModel, autoPublish, ttsVoice, resumeFrom } = job.data;
-    if (resumeFrom) {
-      await resumePipelineService(userId, pipelineId, resumeFrom);
-    } else {
-      await createPipelineService(userId, pipelineId, topic, model, videoModel, !!autoPublish, ttsVoice);
-    }
+    const { userId, pipelineId, autoPublish } = job.data;
+    await dispatchPipelineService(
+      userId,
+      pipelineId,
+      String(job.id ?? `${pipelineId}:${job.attemptsMade}`),
+      !!autoPublish,
+    );
   },
   {
     connection,

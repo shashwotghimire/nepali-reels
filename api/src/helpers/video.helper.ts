@@ -37,7 +37,10 @@ async function getAudioDuration(audioPath: string): Promise<number> {
   return parseFloat(stdout.trim());
 }
 
-export async function validateFinalVideo(filePath: string): Promise<void> {
+export async function validateFinalVideo(
+  filePath: string,
+  maximumDurationSeconds = AI_VIDEO_MAX_TOTAL_DURATION + 1,
+): Promise<void> {
   const { stdout } = await execFileAsync("ffprobe", [
     "-v",
     "error",
@@ -75,9 +78,9 @@ export async function validateFinalVideo(filePath: string): Promise<void> {
   if (pixFmt !== "yuv420p") errors.push(`pix_fmt=${pixFmt} (expected yuv420p)`);
   if (Math.abs(fps - 30) > 0.1)
     errors.push(`fps=${fps.toFixed(2)} (expected 30)`);
-  if (duration > AI_VIDEO_MAX_TOTAL_DURATION + 1) {
+  if (duration > maximumDurationSeconds) {
     errors.push(
-      `duration=${duration.toFixed(2)}s (expected ≤${AI_VIDEO_MAX_TOTAL_DURATION + 1}s)`,
+      `duration=${duration.toFixed(2)}s (expected ≤${maximumDurationSeconds}s)`,
     );
   }
 

@@ -72,6 +72,8 @@ export interface Reel {
   topic: string;
   claudeModel: ClaudeModel;
   videoModel: VideoModel;
+  videoType: "explainer";
+  workflowVersion: number;
   ttsVoice: TtsVoice;
   draftScript: ScriptOutput | null;
   finalScript: ScriptOutput | null;

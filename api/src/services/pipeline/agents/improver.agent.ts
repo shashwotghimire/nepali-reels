@@ -8,6 +8,8 @@ import { tavliySearchTool } from "../../../tools/tavily-search.tool";
 import { runTavilySearch } from "../../../configs/tavily.config";
 import { FACT_CHECK_RUNS } from "../../../constants/constant";
 import { meteredAnthropicCall, meteredTavilySearch, type MeteringContext } from "../llm-metering";
+import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
+import { providerCallBudget } from "../budget-policy.service";
 
 export const improverAgent = async (
   report: AnalyticsReport,
@@ -29,7 +31,10 @@ export const improverAgent = async (
           format: zodOutputFormat(ImproverOutputSchema),
         },
         messages,
-      }, { maxRetries: 0 }));
+      }, { maxRetries: 0 }), providerCallBudget({
+        inputTokens: estimateInputTokenReservation(improverPrompt, messages, tavliySearchTool),
+        outputTokens: 8_192,
+      }));
 
       messages.push({ role: "assistant", content: response.content });
 

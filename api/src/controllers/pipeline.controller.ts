@@ -1,4 +1,4 @@
-import path from "path";
+import path from "node:path";
 import fs from "fs";
 import { Request, Response } from "express";
 import asyncHandler from "../utils/asyncHandler.util";
@@ -9,6 +9,7 @@ import {
   getReelsService,
   getPipelineByIdService,
   deletePipelineService,
+  resolvePipelineAudioPathService,
 } from "../services/reels.service";
 import { getS3PresignedUrl } from "../services/s3.service";
 
@@ -40,14 +41,8 @@ export const getPipelineAudio = asyncHandler(
     const userId = res.locals.user.id;
     const id = req.params.id as string;
 
-    const pipeline = await getPipelineByIdService(userId, id);
-    if (!pipeline) {
-      res.status(404).json(new ApiResponse(false, "Pipeline not found", null));
-      return;
-    }
-
-    const audioPath = path.resolve(`src/audio/${id}.wav`);
-    if (!fs.existsSync(audioPath)) {
+    const audioPath = await resolvePipelineAudioPathService(userId, id);
+    if (!audioPath) {
       res
         .status(404)
         .json(new ApiResponse(false, "Audio not yet generated", null));
@@ -181,8 +176,10 @@ export const generateScript = asyncHandler(
       .json(
         new ApiResponse(true, "Pipeline queued successfully", {
           pipelineId: pipeline.id,
-          model,
-          videoModel,
+          model: pipeline.claudeModel,
+          videoModel: pipeline.videoModel,
+          videoType: pipeline.videoType,
+          workflowVersion: pipeline.workflowVersion,
         }),
       );
   },

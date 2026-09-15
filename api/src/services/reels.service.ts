@@ -4,6 +4,9 @@ import {
   deletePipelineById,
 } from "../repositories/reels.repository";
 import { ApiError } from "../utils/ApiError.util";
+import fs from "node:fs";
+import path from "node:path";
+import { restoreWorkflowFile } from "./pipeline/workflow-artifact.service";
 
 export const getPipelineByIdService = async (
   userId: string,
@@ -14,6 +17,25 @@ export const getPipelineByIdService = async (
     throw new ApiError(404, "Pipeline not found", "Pipeline not found");
   }
   return pipeline;
+};
+
+export const resolvePipelineAudioPathService = async (
+  userId: string,
+  pipelineId: string,
+): Promise<string | null> => {
+  const pipeline = await getPipelineByIdService(userId, pipelineId);
+  const audioPath = path.resolve(`src/audio/${pipelineId}.wav`);
+  if (fs.existsSync(audioPath)) return audioPath;
+
+  const soundSpec = pipeline.soundSpec as { artifactKey?: unknown } | null;
+  if (typeof soundSpec?.artifactKey !== "string") return null;
+  const restored = await restoreWorkflowFile({
+    pipelineId,
+    userId,
+    artifactKey: soundSpec.artifactKey,
+    destination: audioPath,
+  });
+  return restored ? audioPath : null;
 };
 
 export const deletePipelineService = async (userId: string, pipelineId: string) => {
