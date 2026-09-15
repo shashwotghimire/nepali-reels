@@ -56,6 +56,7 @@ import type { ResolvedGenerationEntitlement } from "./entitlement-resolution.ser
 import { createProviderBudgetContext } from "./provider-budget.service";
 import { reelReadyNotificationJobId } from "../../helpers/notification.helper";
 import { createExplainerDurationPolicy } from "./explainer-duration-policy.service";
+import type { MeteringContext } from "./llm-metering";
 
 type StageOutput = Record<string, unknown>;
 
@@ -86,7 +87,7 @@ export async function runExplainerWorkflow(input: {
 
   const budget = createProviderBudgetContext(input.pipelineId, input.access);
   const durationPolicy = createExplainerDurationPolicy(input.access);
-  const metering = {
+  const metering: MeteringContext = {
     userId: input.userId,
     pipelineId: input.pipelineId,
     stage: "",
@@ -110,6 +111,8 @@ export async function runExplainerWorkflow(input: {
     executor: {
       async execute(stage, outputs, lease) {
         metering.stage = stage;
+        if (lease) metering.lease = lease;
+        else delete metering.lease;
         const pipeline = await load();
         switch (stage) {
           case "script": {

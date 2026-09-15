@@ -31,6 +31,7 @@ export async function persistWorkflowFile(input: {
     input.pipelineId,
     input.artifactKey,
     input.extension,
+    input.leaseOwner,
   );
   const uploaded = await uploadWorkflowFile(input.filePath, storageKey, input.contentType);
   return putWorkflowArtifact({

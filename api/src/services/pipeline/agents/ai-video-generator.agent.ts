@@ -87,11 +87,15 @@ async function submitSceneJob(scene: Scene, model: string): Promise<string> {
   return result.id;
 }
 
-async function pollJobUntilDone(jobId: string): Promise<string> {
+async function pollJobUntilDone(
+  jobId: string,
+  assertOwned?: () => Promise<void>,
+): Promise<string> {
   const deadline = Date.now() + AI_VIDEO_POLL_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, AI_VIDEO_POLL_INTERVAL_MS));
+    await assertOwned?.();
 
     const result = await openRouterClient.videoGeneration.getGeneration({
       jobId,
@@ -364,6 +368,7 @@ export async function generateAiVideoClips(
         model,
         fingerprint,
         budget: context.budget!,
+        ...(context.lease ? { lease: context.lease } : {}),
         store: {
           async load() {
             const artifact = await getWorkflowArtifactDetails({
@@ -383,6 +388,10 @@ export async function generateAiVideoClips(
               kind: "video_scene_state",
               fingerprint,
               metadata: state,
+              ...(context.lease ? {
+                stageAttemptId: context.lease.stageAttemptId,
+                leaseOwner: context.lease.leaseOwner,
+              } : {}),
             });
           },
           async restoreCompleted() {
@@ -409,6 +418,10 @@ export async function generateAiVideoClips(
                 providerAttemptId: state.providerAttemptId,
                 attemptNumber: state.attemptNumber,
               },
+              ...(context.lease ? {
+                stageAttemptId: context.lease.stageAttemptId,
+                leaseOwner: context.lease.leaseOwner,
+              } : {}),
             });
             return clipKey;
           },
@@ -416,7 +429,10 @@ export async function generateAiVideoClips(
         provider: {
           submit: submitSceneJob,
           async waitForCompletion(jobId) {
-            await pollJobUntilDone(jobId);
+            await pollJobUntilDone(
+              jobId,
+              context.lease ? () => context.lease!.assertOwned() : undefined,
+            );
           },
           async materialize(jobId) {
             const rawPath = path.join(pipelineDir, `clip-${sceneIndex}-raw.mp4`);

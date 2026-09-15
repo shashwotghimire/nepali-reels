@@ -12,6 +12,7 @@ import {
   putWorkflowArtifact,
 } from "../src/repositories/workflow-execution.repository";
 import { createWorkflowLeaseOwner } from "../src/services/pipeline/workflow-checkpoint.service";
+import { workflowStorageKey } from "../src/helpers/workflow-artifact.helper";
 import {
   dispatchExplainerWorkflow,
   isWorkflowContentionError,
@@ -29,6 +30,11 @@ test("a replay of the same queue job receives a distinct fencing owner", () => {
   assert.notEqual(first, replay);
   assert.match(first, /^job-7:/);
   assert.match(replay, /^job-7:/);
+  assert.notEqual(
+    workflowStorageKey(pipelineId, "v1/video/rendered", "mp4", first),
+    workflowStorageKey(pipelineId, "v1/video/rendered", "mp4", replay),
+    "each lease owner must upload to a distinct object before the database fence selects the winner",
+  );
 });
 
 test("same-execution takeover replaces the expired lease owner", async () => {
@@ -70,6 +76,63 @@ test("same-execution takeover replaces the expired lease owner", async () => {
     Object.assign(WorkflowStageAttempt, {
       findOne: originals.attemptFindOne,
       findOrCreate: originals.attemptFindOrCreate,
+    });
+  }
+});
+
+test("different-execution takeover revokes the old row before its worker resumes", async () => {
+  const originals = {
+    transaction: sequelize.transaction,
+    reelFindOne: Reels.findOne,
+    attemptFindOne: WorkflowStageAttempt.findOne,
+    attemptFindOrCreate: WorkflowStageAttempt.findOrCreate,
+    attemptUpdate: WorkflowStageAttempt.update,
+  };
+  const expired = {
+    id: "11111111-1111-4111-8111-111111111111",
+    pipelineId,
+    workflowVersion: 1,
+    stage: "video",
+    executionKey: "old-job",
+    status: "running",
+    leaseOwner: "old-job:old-worker",
+    leaseExpiresAt: new Date(Date.now() - 1_000),
+    errorMessage: null as string | null,
+    completedAt: null as Date | null,
+    save: async () => {},
+  };
+  let successor: Record<string, unknown> | null = null;
+  Object.assign(sequelize, { transaction: async (callback: (tx: unknown) => unknown) => callback(transaction) });
+  Object.assign(Reels, { findOne: async () => ({ id: pipelineId, userId }) });
+  Object.assign(WorkflowStageAttempt, {
+    findOne: async ({ where }: { where: { status: string } }) => where.status === "running" ? expired : null,
+    findOrCreate: async ({ defaults }: { defaults: Record<string, unknown> }) => {
+      successor = defaults;
+      return [defaults, true];
+    },
+    update: async () => [0],
+  });
+  try {
+    const result = await claimWorkflowStageAttempt({
+      pipelineId, userId, workflowVersion: 1, stage: "video", executionKey: "new-job",
+      leaseOwner: "new-job:new-worker", leaseDurationMs: 30_000,
+    });
+    assert.equal(result.disposition, "claimed");
+    assert.equal(expired.status, "failed");
+    assert.equal(expired.leaseOwner, null);
+    assert.equal(expired.errorMessage, "Stage lease expired and was superseded");
+    assert.equal(successor?.leaseOwner, "new-job:new-worker");
+    await assert.rejects(completeWorkflowStageAttempt({
+      stageAttemptId: expired.id,
+      leaseOwner: "old-job:old-worker",
+    }), /not owned/);
+  } finally {
+    Object.assign(sequelize, { transaction: originals.transaction });
+    Object.assign(Reels, { findOne: originals.reelFindOne });
+    Object.assign(WorkflowStageAttempt, {
+      findOne: originals.attemptFindOne,
+      findOrCreate: originals.attemptFindOrCreate,
+      update: originals.attemptUpdate,
     });
   }
 });

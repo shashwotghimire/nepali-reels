@@ -12,12 +12,14 @@ import {
 import type { BudgetAmounts } from "../../helpers/phase2-budget.helper";
 import type { ProviderBudgetContext } from "./provider-budget.service";
 import { providerCallBudget } from "./budget-policy.service";
+import type { WorkflowStageLease } from "./workflow-dispatcher.service";
 
 export interface MeteringContext {
   userId: string;
   pipelineId: string;
   stage: string;
   budget?: ProviderBudgetContext;
+  lease?: WorkflowStageLease;
 }
 
 const errorMessage = (error: unknown): string =>

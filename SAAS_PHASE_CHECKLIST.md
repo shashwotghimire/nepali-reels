@@ -21,5 +21,8 @@ Phase 2 review corrections:
 - Workflow stage claims lock the stable reel row before checking or inserting attempts.
 - Legacy checkpoint adoption runs once, does not infer linguistic review from `finalScript`, migrates an existing WAV, and regenerates missing local audio under the normal budget.
 - Trusted duration policy controls prompts, script and scene validation, thumbnail inclusion, container validation, and delivered duration: trial is 30 seconds without a thumbnail; paid and legacy compatibility use 74 seconds of content plus the 1-second thumbnail.
+- FFmpeg normalization, concatenation, caption compositing, and thumbnail insertion render to unique temporary files with non-interactive overwrite flags and atomically replace completed outputs, so completed and interrupted local files are safe to replay.
+- Retry status recovery recognizes a durable uploaded video (and an existing TikTok publish ID), restoring `video_generated` or `publish_pending` while the dispatcher reuses successful upload checkpoints.
+- Each worker incarnation receives a unique stage lease owner, renews long-running stages, revokes expired owners during takeover, and fences stale checkpoint, artifact, and scene-provider work. Workflow contention does not mark the active execution failed.
 
 One provider boundary cannot be made fully automatic: after the durable `submitting` marker is written and before the returned provider job ID is persisted, a crash can leave the application unable to tell whether no request was sent or the provider accepted it. The workflow retains the reservation and pending usage record and blocks resubmission. An operator must reconcile that scene to avoid duplicate spend.

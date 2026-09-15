@@ -27,6 +27,7 @@ function harness(options: {
   wait?: (jobId: string) => Promise<void>;
   failSubmittingSave?: boolean;
   failSubmittedSave?: boolean;
+  assertOwned?: () => Promise<void>;
 } = {}) {
   let state = options.initialState ?? null;
   let saveCount = 0;
@@ -94,7 +95,16 @@ function harness(options: {
   };
 
   return {
-    input: { scene, model: "model", fingerprint: "fingerprint", budget, store, provider, usage },
+    input: {
+      scene,
+      model: "model",
+      fingerprint: "fingerprint",
+      budget,
+      store,
+      provider,
+      usage,
+      ...(options.assertOwned ? { lease: { assertOwned: options.assertOwned } } : {}),
+    },
     inspect: () => ({
       state, saveCount, submitCount, materializeCount, restoreCount,
       reservations, finalized, begun, succeeded, failed, cancelled, released,
@@ -186,6 +196,30 @@ test("the provider-acceptance persistence window blocks automatic resubmission",
     ProviderSubmissionUncertainError,
   );
   assert.equal(testRun.inspect().submitCount, 1);
+});
+
+test("a superseded scene worker is fenced before it resumes provider work", async () => {
+  let owned = true;
+  const testRun = harness({
+    initialState: {
+      fingerprint: "fingerprint",
+      attemptNumber: 1,
+      providerAttemptId: "attempt-1",
+      reservationKey: "video-scene:attempt-1",
+      requestedSeconds: 6,
+      status: "submitted",
+      providerJobId: "provider-job-1",
+    },
+    assertOwned: async () => {
+      if (!owned) throw new Error("Workflow stage attempt is not owned by this worker");
+    },
+  });
+
+  owned = false;
+  await assert.rejects(generateVideoScene(testRun.input), /not owned/);
+  assert.equal(testRun.inspect().submitCount, 0);
+  assert.equal(testRun.inspect().materializeCount, 0);
+  assert.equal(testRun.inspect().finalized.length, 0);
 });
 
 test("scene retries stop after three provider-reported failures", async () => {

@@ -16,8 +16,10 @@ export function workflowStorageKey(
   pipelineId: string,
   artifactKey: string,
   extension: string,
+  writeIdentity?: string,
 ): string {
   const safeArtifactKey = artifactKey.replace(/[^a-zA-Z0-9/_-]/g, "_");
   const safeExtension = extension.replace(/[^a-zA-Z0-9]/g, "");
-  return `workflow/${pipelineId}/${safeArtifactKey}.${safeExtension}`;
+  const safeWriteIdentity = writeIdentity?.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `workflow/${pipelineId}/${safeArtifactKey}${safeWriteIdentity ? `.${safeWriteIdentity}` : ""}.${safeExtension}`;
 }

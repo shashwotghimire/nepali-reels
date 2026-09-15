@@ -78,11 +78,13 @@ export async function generateVideoScene(input: {
   store: VideoSceneStateStore;
   provider: VideoSceneProvider;
   usage: VideoSceneUsageLedger;
+  lease?: { assertOwned(): Promise<void> };
 }): Promise<string> {
   let state = await input.store.load();
   if (state && state.fingerprint !== input.fingerprint) state = null;
 
   if (state?.status === "completed") {
+    await input.lease?.assertOwned();
     const restored = await input.store.restoreCompleted(state);
     if (restored) return restored;
     if (!state.providerJobId) throw new Error("Completed scene has neither a durable artifact nor provider job ID");
@@ -138,6 +140,7 @@ export async function generateVideoScene(input: {
       throw error;
     }
 
+    await input.lease?.assertOwned();
     let providerJobId: string;
     try {
       providerJobId = await input.provider.submit(input.scene, input.model);
@@ -167,6 +170,7 @@ export async function generateVideoScene(input: {
 
   if (state.status === "submitted") {
     try {
+      await input.lease?.assertOwned();
       await input.provider.waitForCompletion(state.providerJobId);
     } catch (error) {
       if (!(error instanceof ProviderJobFailedError)) throw error;
@@ -194,6 +198,7 @@ export async function generateVideoScene(input: {
 
   const providerJobId = state.providerJobId;
   if (!providerJobId) throw new ProviderSubmissionUncertainError();
+  await input.lease?.assertOwned();
   const localPath = await input.provider.materialize(providerJobId);
   const artifactKey = await input.store.persistCompleted(localPath, state);
   state = { ...state, status: "completed", artifactKey };
