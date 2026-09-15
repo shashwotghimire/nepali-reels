@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import { randomUUID } from "crypto";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
@@ -31,6 +32,28 @@ import {
 import { EXPLAINER_WORKFLOW_VERSION } from "../../../helpers/workflow.helper";
 
 const execFileAsync = promisify(execFile);
+
+function temporarySiblingPath(filePath: string): string {
+  const extension = path.extname(filePath);
+  const basename = path.basename(filePath, extension);
+  return path.join(
+    path.dirname(filePath),
+    `.${basename}.${process.pid}-${randomUUID()}.tmp${extension}`,
+  );
+}
+
+async function replaceWithFfmpegOutput(
+  outputPath: string,
+  args: string[],
+): Promise<void> {
+  const temporaryPath = temporarySiblingPath(outputPath);
+  try {
+    await execFileAsync("ffmpeg", ["-nostdin", "-y", ...args, temporaryPath]);
+    await fs.promises.rename(temporaryPath, outputPath);
+  } finally {
+    await fs.promises.unlink(temporaryPath).catch(() => {});
+  }
+}
 
 function buildPrompt(bgPrompt: string): string {
   return `${bgPrompt}. Vertical 9:16 portrait composition for TikTok, 720x1280. Cinematic, coherent motion, high detail. No readable text, subtitles, captions, logos, interface elements, or watermark.`;
@@ -103,32 +126,38 @@ async function downloadClip(jobId: string, destPath: string): Promise<void> {
     jobId,
   });
 
-  const writer = fs.createWriteStream(destPath);
+  const temporaryPath = temporarySiblingPath(destPath);
+  const writer = fs.createWriteStream(temporaryPath, { flags: "wx" });
   const reader = stream.getReader();
 
-  await new Promise<void>((resolve, reject) => {
-    writer.on("error", reject);
-    writer.on("finish", resolve);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      writer.on("error", reject);
+      writer.on("finish", resolve);
 
-    const pump = async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            writer.end();
-            break;
+      const pump = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              writer.end();
+              break;
+            }
+            if (!writer.write(value)) {
+              await new Promise((r) => writer.once("drain", r));
+            }
           }
-          if (!writer.write(value)) {
-            await new Promise((r) => writer.once("drain", r));
-          }
+        } catch (err) {
+          writer.destroy(err instanceof Error ? err : new Error(String(err)));
+          reject(err);
         }
-      } catch (err) {
-        writer.destroy(err instanceof Error ? err : new Error(String(err)));
-        reject(err);
-      }
-    };
-    pump();
-  });
+      };
+      void pump();
+    });
+    await fs.promises.rename(temporaryPath, destPath);
+  } finally {
+    await fs.promises.unlink(temporaryPath).catch(() => {});
+  }
 }
 
 async function validateClipWithFfprobe(filePath: string): Promise<void> {
@@ -150,7 +179,7 @@ async function validateClipWithFfprobe(filePath: string): Promise<void> {
   }
 }
 
-async function normalizeClip(
+export async function normalizeClip(
   inputPath: string,
   outputPath: string,
   sceneDurationSec: number,
@@ -170,7 +199,7 @@ async function normalizeClip(
   const hasAudio = audioCheck.trim().includes("audio");
 
   if (hasAudio) {
-    await execFileAsync("ffmpeg", [
+    await replaceWithFfmpegOutput(outputPath, [
       "-i",
       inputPath,
       "-t",
@@ -193,10 +222,9 @@ async function normalizeClip(
       "30",
       "-c:a",
       "aac",
-      outputPath,
     ]);
   } else {
-    await execFileAsync("ffmpeg", [
+    await replaceWithFfmpegOutput(outputPath, [
       "-i",
       inputPath,
       "-f",
@@ -223,24 +251,29 @@ async function normalizeClip(
       "30",
       "-c:a",
       "aac",
-      outputPath,
     ]);
   }
 }
 
-async function concatenateClips(
+export async function concatenateClips(
   clipPaths: string[],
   pipelineDir: string,
   expectedTotalDuration: number,
 ): Promise<string> {
-  const manifestPath = path.join(pipelineDir, "concat.txt");
+  const manifestPath = path.join(
+    pipelineDir,
+    `.concat.${process.pid}-${randomUUID()}.txt`,
+  );
   const outputPath = path.join(pipelineDir, "bg-assembled.mp4");
+  const temporaryOutputPath = temporarySiblingPath(outputPath);
 
   const manifest = clipPaths.map((p) => `file '${path.resolve(p)}'`).join("\n");
   await fs.promises.writeFile(manifestPath, manifest, "utf8");
 
   try {
     await execFileAsync("ffmpeg", [
+      "-nostdin",
+      "-y",
       "-f",
       "concat",
       "-safe",
@@ -249,30 +282,34 @@ async function concatenateClips(
       manifestPath,
       "-c",
       "copy",
-      outputPath,
+      temporaryOutputPath,
     ]);
+
+    const { stdout } = await execFileAsync("ffprobe", [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      temporaryOutputPath,
+    ]);
+    const assembledDuration = parseFloat(stdout.trim());
+    const diff = Math.abs(assembledDuration - expectedTotalDuration);
+    if (diff > AI_VIDEO_DURATION_TOLERANCE) {
+      throw new Error(
+        `[ai-video] assembled bg duration ${assembledDuration.toFixed(3)}s differs from spec ${expectedTotalDuration.toFixed(3)}s by ${diff.toFixed(3)}s (> ${AI_VIDEO_DURATION_TOLERANCE}s tolerance)`,
+      );
+    }
+
+    await fs.promises.rename(temporaryOutputPath, outputPath);
+    return outputPath;
   } finally {
-    await fs.promises.unlink(manifestPath).catch(() => {});
+    await Promise.all([
+      fs.promises.unlink(manifestPath).catch(() => {}),
+      fs.promises.unlink(temporaryOutputPath).catch(() => {}),
+    ]);
   }
-
-  const { stdout } = await execFileAsync("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    outputPath,
-  ]);
-  const assembledDuration = parseFloat(stdout.trim());
-  const diff = Math.abs(assembledDuration - expectedTotalDuration);
-  if (diff > AI_VIDEO_DURATION_TOLERANCE) {
-    throw new Error(
-      `[ai-video] assembled bg duration ${assembledDuration.toFixed(3)}s differs from spec ${expectedTotalDuration.toFixed(3)}s by ${diff.toFixed(3)}s (> ${AI_VIDEO_DURATION_TOLERANCE}s tolerance)`,
-    );
-  }
-
-  return outputPath;
 }
 
 export async function generateAiVideoClips(
@@ -383,11 +420,14 @@ export async function generateAiVideoClips(
           },
           async materialize(jobId) {
             const rawPath = path.join(pipelineDir, `clip-${sceneIndex}-raw.mp4`);
-            await downloadClip(jobId, rawPath);
-            await validateClipWithFfprobe(rawPath);
-            await normalizeClip(rawPath, normPath, scene.endSec - scene.startSec);
-            await fs.promises.unlink(rawPath).catch(() => {});
-            return normPath;
+            try {
+              await downloadClip(jobId, rawPath);
+              await validateClipWithFfprobe(rawPath);
+              await normalizeClip(rawPath, normPath, scene.endSec - scene.startSec);
+              return normPath;
+            } finally {
+              await fs.promises.unlink(rawPath).catch(() => {});
+            }
           },
         },
         usage: {
