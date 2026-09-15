@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import {
+  assertWorkflowStageLease,
   findWorkflowArtifact,
   putWorkflowArtifact,
 } from "../../repositories/workflow-execution.repository";
@@ -19,7 +20,13 @@ export async function persistWorkflowFile(input: {
   contentType: string;
   fingerprint?: string;
   metadata?: object;
+  stageAttemptId?: string;
+  leaseOwner?: string;
 }) {
+  if (input.stageAttemptId) {
+    if (!input.leaseOwner) throw new Error("Workflow stage attempt is not owned by this worker");
+    await assertWorkflowStageLease(input.stageAttemptId, input.leaseOwner);
+  }
   const storageKey = workflowStorageKey(
     input.pipelineId,
     input.artifactKey,
@@ -37,6 +44,7 @@ export async function persistWorkflowFile(input: {
     byteSize: uploaded.byteSize,
     ...(input.fingerprint ? { fingerprint: input.fingerprint } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
+    ...(input.stageAttemptId ? { stageAttemptId: input.stageAttemptId, leaseOwner: input.leaseOwner } : {}),
   });
 }
 
@@ -65,6 +73,8 @@ export async function persistInlineWorkflowArtifact(input: {
   kind: string;
   metadata: object;
   fingerprint?: string;
+  stageAttemptId?: string;
+  leaseOwner?: string;
 }) {
   return putWorkflowArtifact({
     pipelineId: input.pipelineId,
@@ -75,6 +85,7 @@ export async function persistInlineWorkflowArtifact(input: {
     storageKey: input.artifactKey,
     metadata: input.metadata,
     ...(input.fingerprint ? { fingerprint: input.fingerprint } : {}),
+    ...(input.stageAttemptId ? { stageAttemptId: input.stageAttemptId, leaseOwner: input.leaseOwner } : {}),
   });
 }
 

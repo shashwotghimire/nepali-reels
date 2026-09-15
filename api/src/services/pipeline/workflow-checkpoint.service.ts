@@ -1,10 +1,13 @@
 import {
+  assertWorkflowStageLease,
   claimWorkflowStageAttempt,
   completeWorkflowStageAttempt,
   failWorkflowStageAttempt,
   hasWorkflowStageAttempts,
+  renewWorkflowStageAttempt,
   seedSucceededWorkflowStages,
 } from "../../repositories/workflow-execution.repository";
+import { randomUUID } from "node:crypto";
 import {
   EXPLAINER_WORKFLOW_VERSION,
   inferLegacyCompletedStages,
@@ -85,10 +88,14 @@ export async function seedLegacyExplainerCheckpoints(input: {
 }
 
 export function createWorkflowCheckpointPort(
-  leaseOwner: string,
+  executionIdentity: string,
 ): WorkflowCheckpointPort {
+  // BullMQ reuses a job id when the same queue job is replayed. A fresh token
+  // per port instance fences the prior worker incarnation even in that case.
+  const leaseOwner = createWorkflowLeaseOwner(executionIdentity);
   const claimedIds = new Map<ExplainerStage, string>();
   return {
+    leaseRenewalIntervalMs: Math.floor(STAGE_LEASE_MS / 3),
     async claim(input) {
       const result = await claimWorkflowStageAttempt({
         ...input,
@@ -103,7 +110,20 @@ export function createWorkflowCheckpointPort(
         throw new Error(`Workflow execution ${input.executionKey} already failed at ${input.stage}`);
       }
       claimedIds.set(input.stage, result.checkpoint.id);
-      return { state: "claimed" };
+      const stageAttemptId = result.checkpoint.id;
+      return {
+        state: "claimed",
+        lease: {
+          stageAttemptId,
+          leaseOwner,
+          assertOwned: () => assertWorkflowStageLease(stageAttemptId, leaseOwner),
+        },
+      };
+    },
+    async renew(input) {
+      const stageAttemptId = claimedIds.get(input.stage);
+      if (!stageAttemptId) throw new Error(`No claimed checkpoint for ${input.stage}`);
+      await renewWorkflowStageAttempt({ stageAttemptId, leaseOwner, leaseDurationMs: STAGE_LEASE_MS });
     },
     async complete(input) {
       const stageAttemptId = claimedIds.get(input.stage);
@@ -124,4 +144,8 @@ export function createWorkflowCheckpointPort(
       });
     },
   };
+}
+
+export function createWorkflowLeaseOwner(executionIdentity: string): string {
+  return `${executionIdentity}:${randomUUID()}`;
 }

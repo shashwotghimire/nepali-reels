@@ -108,7 +108,7 @@ export async function runExplainerWorkflow(input: {
     executionKey: input.executionKey,
     checkpoints: createWorkflowCheckpointPort(input.executionKey),
     executor: {
-      async execute(stage, outputs) {
+      async execute(stage, outputs, lease) {
         metering.stage = stage;
         const pipeline = await load();
         switch (stage) {
@@ -182,6 +182,7 @@ export async function runExplainerWorkflow(input: {
               contentType: "audio/wav", fingerprint: stableFingerprint({
                 text: videoSpec.voiceoverText, voice: pipeline.ttsVoice ?? "aoede",
               }),
+              ...(lease ? { stageAttemptId: lease.stageAttemptId, leaseOwner: lease.leaseOwner } : {}),
             });
             await saveAudioSpec(input.pipelineId, input.userId, {
               audioFilePath: sound.audioFilePath,
@@ -218,6 +219,7 @@ export async function runExplainerWorkflow(input: {
               contentType: "video/mp4", fingerprint: stableFingerprint({
                 scenes: videoSpec.scenes, model: pipeline.videoModel,
               }),
+              ...(lease ? { stageAttemptId: lease.stageAttemptId, leaseOwner: lease.leaseOwner } : {}),
             });
             await syncCost();
             return { artifactKey };
@@ -238,6 +240,7 @@ export async function runExplainerWorkflow(input: {
                 pipelineId: input.pipelineId, userId: input.userId, artifactKey,
                 kind: "thumbnail", filePath: localPath, extension: "jpg",
                 contentType: "image/jpeg",
+                ...(lease ? { stageAttemptId: lease.stageAttemptId, leaseOwner: lease.leaseOwner } : {}),
               });
               const { url } = await uploadThumbnailToS3(data, input.pipelineId);
               await saveThumbnailUrl(input.pipelineId, input.userId, url);
@@ -285,6 +288,7 @@ export async function runExplainerWorkflow(input: {
               pipelineId: input.pipelineId, userId: input.userId, artifactKey,
               kind: "rendered_video", filePath: finalPath, extension: "mp4",
               contentType: "video/mp4",
+              ...(lease ? { stageAttemptId: lease.stageAttemptId, leaseOwner: lease.leaseOwner } : {}),
             });
             return { artifactKey, durationSeconds };
           }

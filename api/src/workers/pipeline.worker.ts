@@ -2,6 +2,7 @@ import { Worker } from "bullmq";
 import { dispatchPipelineService, markPipelineAsFailedService } from "../services/pipeline/pipeline.service";
 import { connection } from "../configs/redis.config";
 import { toUserFriendlyError } from "../utils/error-messages.js";
+import { shouldMarkPipelineFailed } from "../services/pipeline/workflow-dispatcher.service";
 
 export const pipelineWorker = new Worker(
   "pipeline",
@@ -23,7 +24,7 @@ export const pipelineWorker = new Worker(
 pipelineWorker.on("completed", (job) => console.log(`[worker] job ${job.id} completed`));
 pipelineWorker.on("failed", async (job, err) => {
   console.error(`[worker] job ${job?.id} failed:`, err);
-  if (job?.data?.pipelineId) {
+  if (job?.data?.pipelineId && shouldMarkPipelineFailed(err)) {
     await markPipelineAsFailedService(job.data.pipelineId, toUserFriendlyError(err), job.data.userId);
   }
 });
