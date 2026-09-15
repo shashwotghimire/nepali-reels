@@ -224,7 +224,7 @@ export default function PipelineDetail() {
           </Badge>
           {data.costUsd != null && (
             <p className="text-xs text-muted-foreground tabular-nums">
-              ${data.costUsd.toFixed(4)}
+              Known estimated cost: ${data.costUsd.toFixed(4)}{data.costEstimateIncomplete !== false ? " (partial)" : ""}
             </p>
           )}
         </div>

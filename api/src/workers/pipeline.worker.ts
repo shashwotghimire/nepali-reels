@@ -23,6 +23,6 @@ pipelineWorker.on("completed", (job) => console.log(`[worker] job ${job.id} comp
 pipelineWorker.on("failed", async (job, err) => {
   console.error(`[worker] job ${job?.id} failed:`, err);
   if (job?.data?.pipelineId) {
-    await markPipelineAsFailedService(job.data.pipelineId, toUserFriendlyError(err));
+    await markPipelineAsFailedService(job.data.pipelineId, toUserFriendlyError(err), job.data.userId);
   }
 });

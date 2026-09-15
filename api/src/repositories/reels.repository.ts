@@ -157,10 +157,12 @@ export const savePipelineCost = async (
   pipelineId: string,
   userId: string,
   costUsd: number,
+  costEstimateIncomplete = true,
 ) => {
   const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
   if (!pipeline) throw new Error("Reel not found");
-  pipeline.costUsd = costUsd;
+  pipeline.costUsd = (pipeline.legacyCostUsd ?? 0) + costUsd;
+  pipeline.costEstimateIncomplete = costEstimateIncomplete || pipeline.legacyCostUsd != null;
   await pipeline.save();
 };
 

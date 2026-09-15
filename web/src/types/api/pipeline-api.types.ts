@@ -83,6 +83,7 @@ export interface Reel {
   videoDurationSec: number | null;
   videoUrl: string | null;
   costUsd: number | null;
+  costEstimateIncomplete?: boolean;
   createdAt: string;
   updatedAt: string;
 }

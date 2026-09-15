@@ -29,6 +29,8 @@ export class Reels extends Model<
   declare tiktokPublishId: CreationOptional<string | null>;
   declare thumbnailUrl: CreationOptional<string | null>;
   declare costUsd: CreationOptional<number | null>;
+  declare legacyCostUsd: CreationOptional<number | null>;
+  declare costEstimateIncomplete: CreationOptional<boolean>;
   declare ttsVoice: CreationOptional<string | null>;
   declare failureReason: CreationOptional<string | null>;
   declare createdAt: CreationOptional<Date>;
@@ -112,6 +114,15 @@ Reels.init(
     costUsd: {
       type: DataTypes.FLOAT,
       allowNull: true,
+    },
+    legacyCostUsd: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    costEstimateIncomplete: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
     },
     ttsVoice: {
       type: DataTypes.STRING,

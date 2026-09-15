@@ -10,6 +10,9 @@ import {
   AI_VIDEO_DURATION_TOLERANCE,
   type VideoModel,
 } from "../../../constants/constant";
+import { randomUUID } from "crypto";
+import { beginProviderAttempt, finishProviderAttempt } from "../../../repositories/provider-usage.repository";
+import { calculateVideoCost } from "../../../utils/cost.util";
 
 const execFileAsync = promisify(execFile);
 
@@ -260,6 +263,7 @@ export async function generateAiVideoClips(
   scenes: Scene[],
   pipelineId: string,
   videoModel: VideoModel,
+  context?: { userId: string; pipelineId: string; stage: string },
 ): Promise<string> {
   const model = videoModel;
 
@@ -278,18 +282,35 @@ export async function generateAiVideoClips(
     console.log(
       `[ai-video:${pipelineId}] submitting batch ${Math.floor(b / BATCH_SIZE) + 1} (scenes ${b}–${b + batch.length - 1})...`,
     );
-    const batchIds = await Promise.all(
-      batch.map((scene) => submitSceneJob(scene, model)),
-    );
-    jobIds.push(...batchIds);
-
-    console.log(
-      `[ai-video:${pipelineId}] polling batch ${Math.floor(b / BATCH_SIZE) + 1}...`,
-    );
-    const batchUrls = await Promise.all(
-      batchIds.map((id) => pollJobUntilDone(id)),
-    );
-    videoUrls.push(...batchUrls);
+    const settled = await Promise.allSettled(batch.map(async (scene) => {
+      const attemptId = randomUUID();
+      const requestedSeconds = Math.round(scene.endSec - scene.startSec);
+      if (context) await beginProviderAttempt({ attemptId, userId: context.userId,
+        pipelineId: context.pipelineId, operation: "video_generation", stage: context.stage,
+        provider: "openrouter", model,
+        configuration: { duration: requestedSeconds, aspectRatio: "9:16", resolution: "480p", generateAudio: false } });
+      try {
+        const jobId = await submitSceneJob(scene, model);
+        const url = await pollJobUntilDone(jobId);
+        if (context) await finishProviderAttempt({ attemptId, status: "succeeded",
+          usage: { generatedVideoSeconds: requestedSeconds },
+          costUsd: calculateVideoCost(requestedSeconds, videoModel).toString(),
+          costProvenance: "estimated", rateVersion: "planning-2026-09-14" });
+        return { jobId, url };
+      } catch (error) {
+        if (context) await finishProviderAttempt({ attemptId, status: "failed",
+          costUsd: null, costProvenance: "unknown", error: String(error) });
+        throw error;
+      }
+    }));
+    const failed = settled.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
+    const batchResults = settled.map((result) => {
+      if (result.status !== "fulfilled") throw result.reason;
+      return result.value;
+    });
+    jobIds.push(...batchResults.map((result) => result.jobId));
+    videoUrls.push(...batchResults.map((result) => result.url));
   }
 
   const normalizedPaths: string[] = [];

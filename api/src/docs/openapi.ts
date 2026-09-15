@@ -585,6 +585,7 @@ export const openApiDocument = {
           tiktokPublishId: { type: ["string", "null"] },
           thumbnailUrl: { type: ["string", "null"] },
           costUsd: { type: ["number", "null"], format: "float" },
+          costEstimateIncomplete: { type: "boolean", description: "True when provider cost is unknown or metering is pending; costUsd is only the known estimated subtotal." },
           failureReason: { type: ["string", "null"] },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
