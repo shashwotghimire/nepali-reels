@@ -89,10 +89,10 @@ export async function seedLegacyExplainerCheckpoints(input: {
 
 export function createWorkflowCheckpointPort(
   executionIdentity: string,
+  leaseOwner = createWorkflowLeaseOwner(executionIdentity),
 ): WorkflowCheckpointPort {
   // BullMQ reuses a job id when the same queue job is replayed. A fresh token
   // per port instance fences the prior worker incarnation even in that case.
-  const leaseOwner = createWorkflowLeaseOwner(executionIdentity);
   const claimedIds = new Map<ExplainerStage, string>();
   return {
     leaseRenewalIntervalMs: Math.floor(STAGE_LEASE_MS / 3),

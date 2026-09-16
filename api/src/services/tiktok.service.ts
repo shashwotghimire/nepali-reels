@@ -12,6 +12,7 @@ import {
 } from "../repositories/reels.repository";
 import { ApiError } from "../utils/ApiError.util";
 import { enqueueTiktokStatusPoll } from "../queue/tiktok.queue";
+import type { WorkflowLeaseGuard } from "../types/workflow-lease.types";
 
 export const buildAuthUrl = () => {
   const state = generateToken();
@@ -207,12 +208,15 @@ export const uploadToTiktokService = async (
   brandContentToggle: boolean,
   brandOrganicToggle: boolean,
   isAigc: boolean,
+  lease?: WorkflowLeaseGuard,
 ) => {
+  await lease?.assertOwned();
   // getValidAccessToken is called inside getCreatorInfoService; resolve token once
   // here so the publish call can reuse it without a second DB round-trip.
   const accessToken = await getValidAccessToken(userId);
 
   // Validate privacy level and duration against this creator's TikTok limits.
+  await lease?.assertOwned();
   const [creatorInfo, pipeline] = await Promise.all([
     getCreatorInfoService(userId),
     findPipelineById(pipelineId, userId),
@@ -272,6 +276,7 @@ export const uploadToTiktokService = async (
     is_aigc: isAigc,
   };
 
+  await lease?.assertOwned();
   const res = await fetch(
     "https://open.tiktokapis.com/v2/post/publish/video/init/",
     {
@@ -298,7 +303,8 @@ export const uploadToTiktokService = async (
     );
   }
   const publishId = data.data.publish_id;
-  await publishToTiktok(pipelineId, userId, publishId);
+  await publishToTiktok(pipelineId, userId, publishId, lease);
+  await lease?.assertOwned();
   await enqueueTiktokStatusPoll(publishId, pipelineId, userId);
   return publishId;
 };

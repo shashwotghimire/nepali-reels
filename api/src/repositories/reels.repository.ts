@@ -1,8 +1,66 @@
-import { Op } from "sequelize";
+import { Op, type Transaction } from "sequelize";
+import sequelize from "../configs/db.config";
 import Reels from "../models/reels.model";
+import WorkflowStageAttempt from "../models/workflow-stage-attempt.model";
 import { ScriptOutput } from "../schema/script-writer.schema";
 import { VideoSpec } from "../schema/video-spec.schema";
 import { PipelineStatus } from "../types/pipeline.types";
+import {
+  WorkflowLeaseLostError,
+  type WorkflowLeaseWriteFence,
+} from "../types/workflow-lease.types";
+
+async function findOwnedPipelineForUpdate(
+  pipelineId: string,
+  userId: string,
+  transaction: Transaction,
+) {
+  const pipeline = await Reels.findOne({
+    where: { id: pipelineId, userId },
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (!pipeline) throw new Error("Reel not found");
+  return pipeline;
+}
+
+async function mutatePipelineWithLease(
+  pipelineId: string,
+  userId: string,
+  lease: WorkflowLeaseWriteFence | undefined,
+  mutate: (pipeline: Reels, transaction?: Transaction) => Promise<void> | void,
+) {
+  if (!lease) {
+    const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
+    if (!pipeline) throw new Error("Reel not found");
+    await mutate(pipeline);
+    await pipeline.save();
+    return;
+  }
+
+  await sequelize.transaction(async (transaction) => {
+    // Match claim/takeover lock ordering: the stable reel row is always locked
+    // before its stage attempt. This keeps validation and mutation atomic.
+    const pipeline = await findOwnedPipelineForUpdate(pipelineId, userId, transaction);
+    const attempt = await WorkflowStageAttempt.findByPk(lease.stageAttemptId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    const now = Date.now();
+    if (
+      !attempt
+      || attempt.pipelineId !== pipelineId
+      || attempt.status !== "running"
+      || attempt.leaseOwner !== lease.leaseOwner
+      || !attempt.leaseExpiresAt
+      || attempt.leaseExpiresAt.getTime() <= now
+    ) {
+      throw new WorkflowLeaseLostError();
+    }
+    await mutate(pipeline, transaction);
+    await pipeline.save({ transaction });
+  });
+}
 
 export const createPipeline = (
   userId: string,
@@ -25,95 +83,60 @@ export const saveDraftScript = async (
   pipelineId: string,
   userId: string,
   draftScript: ScriptOutput,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({
-    where: {
-      id: pipelineId,
-      userId,
-    },
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.draftScript = draftScript;
+    pipeline.pipelineStatus = "script_generated";
   });
-  if (!pipeline) {
-    throw new Error("Reel not found");
-  }
-  pipeline.draftScript = draftScript;
-  pipeline.pipelineStatus = "script_generated";
-  await pipeline.save();
 };
 
 export const saveFinalScript = async (
   pipelineId: string,
   userId: string,
   finalScript: ScriptOutput,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({
-    where: {
-      id: pipelineId,
-      userId,
-    },
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.finalScript = finalScript;
+    pipeline.pipelineStatus = "script_finalised";
   });
-  if (!pipeline) {
-    throw new Error("Reel not found");
-  }
-  pipeline.finalScript = finalScript;
-  pipeline.pipelineStatus = "script_finalised";
-  await pipeline.save();
 };
 
 export const saveLinguisticReview = async (
   pipelineId: string,
   userId: string,
   finalScript: ScriptOutput,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({
-    where: {
-      id: pipelineId,
-      userId,
-    },
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.finalScript = finalScript;
+    pipeline.pipelineStatus = "linguistic_reviewed";
   });
-  if (!pipeline) {
-    throw new Error("Reel not found");
-  }
-  pipeline.finalScript = finalScript;
-  pipeline.pipelineStatus = "linguistic_reviewed";
-  await pipeline.save();
 };
 
 export const saveVideoSpec = async (
   pipelineId: string,
   userId: string,
   videoSpec: VideoSpec,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({
-    where: {
-      id: pipelineId,
-      userId,
-    },
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.videoSpec = videoSpec;
+    pipeline.pipelineStatus = "video_spec_generated";
   });
-  if (!pipeline) {
-    throw new Error("Reel not found");
-  }
-  pipeline.videoSpec = videoSpec;
-  pipeline.pipelineStatus = "video_spec_generated";
-  await pipeline.save();
 };
 
 export const saveAudioSpec = async (
   pipelineId: string,
   userId: string,
   soundSpec: any,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({
-    where: {
-      id: pipelineId,
-      userId,
-    },
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.soundSpec = soundSpec;
+    pipeline.pipelineStatus = "sound_generated";
   });
-  if (!pipeline) {
-    throw new Error("Reel not found");
-  }
-  pipeline.soundSpec = soundSpec;
-  pipeline.pipelineStatus = "sound_generated";
-  await pipeline.save();
 };
 
 export const saveVideoOutput = async (
@@ -121,36 +144,36 @@ export const saveVideoOutput = async (
   userId: string,
   s3key: string,
   videoDurationSec: number,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
-  if (!pipeline) throw new Error("Reel not found");
-  pipeline.pipelineStatus = "video_generated";
-  pipeline.s3key = s3key;
-  pipeline.videoDurationSec = videoDurationSec;
-  await pipeline.save();
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.pipelineStatus = "video_generated";
+    pipeline.s3key = s3key;
+    pipeline.videoDurationSec = videoDurationSec;
+  });
 };
 
 export const saveThumbnailUrl = async (
   pipelineId: string,
   userId: string,
   thumbnailUrl: string,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
-  if (!pipeline) throw new Error("Reel not found");
-  pipeline.thumbnailUrl = thumbnailUrl;
-  await pipeline.save();
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.thumbnailUrl = thumbnailUrl;
+  });
 };
 
 export const publishToTiktok = async (
   pipelineId: string,
   userId: string,
   tiktokPublishId: string,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
-  if (!pipeline) throw new Error("Reel not found");
-  pipeline.tiktokPublishId = tiktokPublishId;
-  pipeline.pipelineStatus = "publish_pending";
-  await pipeline.save();
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.tiktokPublishId = tiktokPublishId;
+    pipeline.pipelineStatus = "publish_pending";
+  });
 };
 
 export const savePipelineCost = async (
@@ -158,20 +181,12 @@ export const savePipelineCost = async (
   userId: string,
   costUsd: number,
   costEstimateIncomplete = true,
+  lease?: WorkflowLeaseWriteFence,
 ) => {
-  const pipeline = await Reels.findOne({ where: { id: pipelineId, userId } });
-  if (!pipeline) throw new Error("Reel not found");
-  pipeline.costUsd = (pipeline.legacyCostUsd ?? 0) + costUsd;
-  pipeline.costEstimateIncomplete = costEstimateIncomplete || pipeline.legacyCostUsd != null;
-  await pipeline.save();
-};
-
-export const markPipelineAsFailed = async (pipelineId: string, failureReason?: string) => {
-  const pipeline = await Reels.findOne({ where: { id: pipelineId } });
-  if (!pipeline) throw new Error("Reel not found");
-  pipeline.pipelineStatus = "failed";
-  if (failureReason) pipeline.failureReason = failureReason;
-  await pipeline.save();
+  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+    pipeline.costUsd = (pipeline.legacyCostUsd ?? 0) + costUsd;
+    pipeline.costEstimateIncomplete = costEstimateIncomplete || pipeline.legacyCostUsd != null;
+  });
 };
 
 export const resetPipelineForRetry = async (

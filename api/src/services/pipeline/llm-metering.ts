@@ -11,7 +11,7 @@ import {
 } from "../../repositories/provider-usage.repository";
 import type { BudgetAmounts } from "../../helpers/phase2-budget.helper";
 import type { ProviderBudgetContext } from "./provider-budget.service";
-import { providerCallBudget } from "./budget-policy.service";
+import { providerCallBudget, type BudgetReservation } from "./budget-policy.service";
 import type { WorkflowStageLease } from "./workflow-dispatcher.service";
 
 export interface MeteringContext {
@@ -37,6 +37,38 @@ const retryable = (error: unknown): boolean => {
 
 const pause = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+/**
+ * The ledger row and reservation are created before the ownership check so a
+ * crash cannot hide an invocation. If the check proves this worker stale, no
+ * provider call occurred: close the row at zero cost and reopen the budget.
+ */
+export async function assertProviderCallOwned(
+  context: MeteringContext | undefined,
+  attemptId: string,
+  reservation?: BudgetReservation,
+): Promise<void> {
+  if (!context?.lease) return;
+  try {
+    await context.lease.assertOwned();
+  } catch (error) {
+    const cleanup = await Promise.allSettled([
+      finishProviderAttempt({
+        attemptId,
+        status: "failed",
+        costUsd: 0,
+        costProvenance: "actual",
+        error: errorMessage(error),
+      }),
+      ...(reservation && context.budget
+        ? [context.budget.releaseBeforeStart(reservation)]
+        : []),
+    ]);
+    const cleanupFailure = cleanup.find((result) => result.status === "rejected");
+    if (cleanupFailure?.status === "rejected") throw cleanupFailure.reason;
+    throw error;
+  }
+}
 
 /** SDK retries must be disabled by callers so that every network attempt is visible here. */
 export async function meteredAnthropicCall<T extends AnthropicUsageResponse>(
@@ -73,6 +105,7 @@ export async function meteredAnthropicCall<T extends AnthropicUsageResponse>(
       }
     }
 
+    await assertProviderCallOwned(context, attemptId, budgetReservation);
     let response: T;
     try {
       response = await invoke();
@@ -161,6 +194,7 @@ export async function meteredTavilySearch<T>(
     if (budgetReservation) await context.budget!.releaseBeforeStart(budgetReservation);
     throw error;
   }
+  await assertProviderCallOwned(context, attemptId, budgetReservation);
   let result: T;
   try {
     result = await search();

@@ -7,7 +7,7 @@ import { estimateTtsTokenCost } from "../../../utils/cost.util";
 import { extractTtsUsage } from "../../../helpers/usage.helper";
 import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
 import { providerCallBudget } from "../budget-policy.service";
-import type { MeteringContext } from "../llm-metering";
+import { assertProviderCallOwned, type MeteringContext } from "../llm-metering";
 
 
 export const generateTextToSpeechAgent = async (
@@ -36,6 +36,7 @@ export const generateTextToSpeechAgent = async (
       throw error;
     }
   }
+  await assertProviderCallOwned(context, attemptId, reservation);
   let response;
   try {
     response = await gClient.interactions.create({
@@ -85,6 +86,7 @@ export const generateTextToSpeechAgent = async (
     inputTokens,
     outputTokens: outputAudioTokens,
   });
+  await context?.lease?.assertOwned();
   const audioBuffer = Buffer.from(audioData, "base64");
   const filePath = `src/audio/${pipelineId}.wav`;
   await saveWaveFile(filePath, audioBuffer);

@@ -4,6 +4,9 @@ import sequelize from "../configs/db.config";
 import Reels from "../models/reels.model";
 import WorkflowArtifact from "../models/workflow-artifact.model";
 import WorkflowStageAttempt from "../models/workflow-stage-attempt.model";
+import {
+  WorkflowLeaseLostError,
+} from "../types/workflow-lease.types";
 
 async function requireOwnedPipeline(
   pipelineId: string,
@@ -95,7 +98,9 @@ export type ClaimWorkflowStageResult =
   | { disposition: "reuse"; checkpoint: WorkflowStageAttempt }
   | { disposition: "failed"; checkpoint: WorkflowStageAttempt };
 
-const STAGE_NOT_OWNED_ERROR = "Workflow stage attempt is not owned by this worker";
+function leaseLost(): WorkflowLeaseLostError {
+  return new WorkflowLeaseLostError();
+}
 
 function hasActiveLease(
   checkpoint: Pick<WorkflowStageAttempt, "status" | "leaseOwner" | "leaseExpiresAt">,
@@ -212,7 +217,7 @@ export async function ensureStageProviderAttemptId(stageAttemptId: string, lease
       lock: transaction.LOCK.UPDATE,
     });
     if (!checkpoint) throw new Error("Workflow stage attempt not found");
-    if (!hasActiveLease(checkpoint, leaseOwner)) throw new Error(STAGE_NOT_OWNED_ERROR);
+    if (!hasActiveLease(checkpoint, leaseOwner)) throw leaseLost();
     if (!checkpoint.providerAttemptId) {
       checkpoint.providerAttemptId = randomUUID();
       await checkpoint.save({ transaction });
@@ -223,7 +228,7 @@ export async function ensureStageProviderAttemptId(stageAttemptId: string, lease
 
 export async function assertWorkflowStageLease(stageAttemptId: string, leaseOwner: string): Promise<void> {
   const checkpoint = await WorkflowStageAttempt.findByPk(stageAttemptId);
-  if (!checkpoint || !hasActiveLease(checkpoint, leaseOwner)) throw new Error(STAGE_NOT_OWNED_ERROR);
+  if (!checkpoint || !hasActiveLease(checkpoint, leaseOwner)) throw leaseLost();
 }
 
 export async function renewWorkflowStageAttempt(input: {
@@ -243,7 +248,7 @@ export async function renewWorkflowStageAttempt(input: {
     leaseOwner: input.leaseOwner,
     leaseExpiresAt: { [Op.gt]: now },
   } });
-  if (updated === 0) throw new Error(STAGE_NOT_OWNED_ERROR);
+  if (updated === 0) throw leaseLost();
 }
 
 export async function completeWorkflowStageAttempt(input: {
@@ -256,7 +261,9 @@ export async function completeWorkflowStageAttempt(input: {
     status: "succeeded",
     output: input.output ?? null,
     errorMessage: null,
-    leaseOwner: null,
+    // Retain the terminal owner as a fencing/audit token. Status makes the
+    // lease inactive; clearing only its expiry prevents accidental reuse.
+    leaseOwner: input.leaseOwner,
     leaseExpiresAt: null,
     completedAt: now,
   }, { where: {
@@ -265,7 +272,7 @@ export async function completeWorkflowStageAttempt(input: {
     leaseOwner: input.leaseOwner,
     leaseExpiresAt: { [Op.gt]: now },
   } });
-  if (updated === 0) throw new Error(STAGE_NOT_OWNED_ERROR);
+  if (updated === 0) throw leaseLost();
 }
 
 export async function failWorkflowStageAttempt(input: {
@@ -277,7 +284,7 @@ export async function failWorkflowStageAttempt(input: {
   const [updated] = await WorkflowStageAttempt.update({
     status: "failed",
     errorMessage: input.errorMessage,
-    leaseOwner: null,
+    leaseOwner: input.leaseOwner,
     leaseExpiresAt: null,
     completedAt: now,
   }, { where: {
@@ -286,7 +293,50 @@ export async function failWorkflowStageAttempt(input: {
     leaseOwner: input.leaseOwner,
     leaseExpiresAt: { [Op.gt]: now },
   } });
-  if (updated === 0) throw new Error(STAGE_NOT_OWNED_ERROR);
+  if (updated === 0) throw leaseLost();
+}
+
+/**
+ * Fail a reel only while the reporting worker is still the latest workflow
+ * owner. Claims take the same reel lock, so a successor cannot race this
+ * decision between the ownership check and the status write.
+ */
+export async function markPipelineFailedIfExecutionOwned(input: {
+  pipelineId: string;
+  userId: string;
+  workflowVersion: number;
+  executionKey: string;
+  leaseOwner: string;
+  failureReason?: string;
+}): Promise<boolean> {
+  return sequelize.transaction(async (transaction) => {
+    const pipeline = await requireOwnedPipeline(input.pipelineId, input.userId, transaction, true);
+    const latest = await WorkflowStageAttempt.findOne({
+      where: {
+        pipelineId: input.pipelineId,
+        workflowVersion: input.workflowVersion,
+      },
+      order: [
+        ["updatedAt", "DESC"],
+        ["createdAt", "DESC"],
+      ],
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    // Failures before the first checkpoint still belong to this execution.
+    // Once a checkpoint exists, its retained owner token is authoritative,
+    // including after a same-job successor completes the shared attempt row.
+    if (latest && (
+      latest.executionKey !== input.executionKey
+      || latest.leaseOwner !== input.leaseOwner
+    )) return false;
+
+    pipeline.pipelineStatus = "failed";
+    if (input.failureReason) pipeline.failureReason = input.failureReason;
+    await pipeline.save({ transaction });
+    return true;
+  });
 }
 
 export async function getWorkflowStageAttempt(input: {
@@ -344,13 +394,13 @@ export async function putWorkflowArtifact(input: PutWorkflowArtifactInput) {
   return sequelize.transaction(async (transaction) => {
     await requireOwnedPipeline(input.pipelineId, input.userId, transaction);
     if (input.stageAttemptId) {
-      if (!input.leaseOwner) throw new Error(STAGE_NOT_OWNED_ERROR);
+      if (!input.leaseOwner) throw leaseLost();
       const checkpoint = await WorkflowStageAttempt.findByPk(input.stageAttemptId, {
         transaction,
         lock: transaction.LOCK.UPDATE,
       });
       if (!checkpoint || checkpoint.pipelineId !== input.pipelineId || !hasActiveLease(checkpoint, input.leaseOwner)) {
-        throw new Error(STAGE_NOT_OWNED_ERROR);
+        throw leaseLost();
       }
     }
     const existing = await WorkflowArtifact.findOne({

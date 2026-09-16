@@ -9,6 +9,7 @@ import type { PipelineStatus } from "../../types/pipeline.types";
 import { ApiError } from "../../utils/ApiError.util";
 import { inferLegacyCompletedStages } from "../../helpers/workflow.helper";
 import { resolveLegacyCompatibilityAccess } from "./entitlement-resolution.service";
+import { createWorkflowLeaseOwner } from "./workflow-checkpoint.service";
 
 /** New pipelines use the centrally configured standard generation models. */
 export const initPipelineService = async (
@@ -32,12 +33,14 @@ export const dispatchPipelineService = async (
   pipelineId: string,
   executionKey: string,
   autoPublish = false,
+  leaseOwner = createWorkflowLeaseOwner(executionKey),
 ) => {
   const { runExplainerWorkflow } = await import("./explainer-workflow.service.js");
   return runExplainerWorkflow({
     userId,
     pipelineId,
     executionKey,
+    leaseOwner,
     autoPublish,
     access: resolveLegacyCompatibilityAccess(userId),
   });

@@ -57,6 +57,8 @@ import { createProviderBudgetContext } from "./provider-budget.service";
 import { reelReadyNotificationJobId } from "../../helpers/notification.helper";
 import { createExplainerDurationPolicy } from "./explainer-duration-policy.service";
 import type { MeteringContext } from "./llm-metering";
+import type { WorkflowStageLease } from "./workflow-dispatcher.service";
+import { runWithActiveStageLease } from "./workflow-lease.service";
 
 type StageOutput = Record<string, unknown>;
 
@@ -71,6 +73,7 @@ export async function runExplainerWorkflow(input: {
   userId: string;
   pipelineId: string;
   executionKey: string;
+  leaseOwner: string;
   autoPublish: boolean;
   access: ResolvedGenerationEntitlement;
 }) {
@@ -93,9 +96,9 @@ export async function runExplainerWorkflow(input: {
     stage: "",
     budget,
   };
-  const syncCost = async () => {
+  const syncCost = async (lease: WorkflowStageLease) => {
     const summary = await getPipelineCostSummary(input.pipelineId, input.userId);
-    await savePipelineCost(input.pipelineId, input.userId, summary.knownCostUsd, true);
+    await savePipelineCost(input.pipelineId, input.userId, summary.knownCostUsd, true, lease);
   };
   const load = async () => {
     const pipeline = await findPipelineById(input.pipelineId, input.userId);
@@ -107,12 +110,12 @@ export async function runExplainerWorkflow(input: {
     pipelineId: input.pipelineId,
     userId: input.userId,
     executionKey: input.executionKey,
-    checkpoints: createWorkflowCheckpointPort(input.executionKey),
+    checkpoints: createWorkflowCheckpointPort(input.executionKey, input.leaseOwner),
     executor: {
       async execute(stage, outputs, lease) {
+        if (!lease) throw new Error(`Workflow stage ${stage} has no active lease`);
         metering.stage = stage;
-        if (lease) metering.lease = lease;
-        else delete metering.lease;
+        metering.lease = lease;
         const pipeline = await load();
         switch (stage) {
           case "script": {
@@ -123,15 +126,15 @@ export async function runExplainerWorkflow(input: {
               durationPolicy.promptDuration,
             );
             durationPolicy.validateScript(result.data);
-            await saveDraftScript(input.pipelineId, input.userId, result.data);
-            await syncCost();
+            await saveDraftScript(input.pipelineId, input.userId, result.data, lease);
+            await syncCost(lease);
             return { persisted: "draftScript" };
           }
           case "fact_check": {
             const draftScript = pipeline.draftScript as ScriptOutput | null;
             if (!draftScript) throw new Error("Draft script checkpoint has no script");
             const { data: factCheck } = await factCheckerAgent(draftScript, pipeline.claudeModel, metering);
-            await syncCost();
+            await syncCost(lease);
             let finalScript: ScriptOutput;
             if (factCheck?.verdict === "pass") finalScript = draftScript;
             else if (factCheck?.verdict === "revise") finalScript = factCheck.revisedScript!;
@@ -139,14 +142,14 @@ export async function runExplainerWorkflow(input: {
               throw new ApiError(400, `Script is unsafe: ${JSON.stringify(factCheck.issues)}`, "Script is not safe.");
             } else throw new Error("Unexpected fact-check verdict");
             durationPolicy.validateScript(finalScript);
-            await saveFinalScript(input.pipelineId, input.userId, finalScript);
+            await saveFinalScript(input.pipelineId, input.userId, finalScript, lease);
             return { persisted: "finalScript" };
           }
           case "linguistic_review": {
             const finalScript = pipeline.finalScript as ScriptOutput | null;
             if (!finalScript) throw new Error("Final script checkpoint has no script");
             const { data: review } = await linguisticExpertAgent(finalScript, pipeline.claudeModel, metering);
-            await syncCost();
+            await syncCost(lease);
             const reviewedScript = review?.verdict === "revise"
               ? review.revisedScript!
               : finalScript;
@@ -155,6 +158,7 @@ export async function runExplainerWorkflow(input: {
               input.pipelineId,
               input.userId,
               reviewedScript,
+              lease,
             );
             return { persisted: "finalScript" };
           }
@@ -168,8 +172,8 @@ export async function runExplainerWorkflow(input: {
               durationPolicy.promptDuration,
             );
             durationPolicy.validateVideoSpec(videoSpec);
-            await saveVideoSpec(input.pipelineId, input.userId, videoSpec);
-            await syncCost();
+            await saveVideoSpec(input.pipelineId, input.userId, videoSpec, lease);
+            await syncCost(lease);
             return { persisted: "videoSpec" };
           }
           case "audio": {
@@ -190,8 +194,8 @@ export async function runExplainerWorkflow(input: {
             await saveAudioSpec(input.pipelineId, input.userId, {
               audioFilePath: sound.audioFilePath,
               artifactKey,
-            });
-            await syncCost();
+            }, lease);
+            await syncCost(lease);
             return { artifactKey };
           }
           case "alignment": {
@@ -206,7 +210,7 @@ export async function runExplainerWorkflow(input: {
               }))) throw new Error("Durable narration artifact is unavailable");
             }
             const captions = await forcedAlignmentAgent(audioPath, videoSpec.voiceoverText, metering);
-            await syncCost();
+            await syncCost(lease);
             return { captions };
           }
           case "video": {
@@ -224,7 +228,7 @@ export async function runExplainerWorkflow(input: {
               }),
               ...(lease ? { stageAttemptId: lease.stageAttemptId, leaseOwner: lease.leaseOwner } : {}),
             });
-            await syncCost();
+            await syncCost(lease);
             return { artifactKey };
           }
           case "thumbnail": {
@@ -245,12 +249,15 @@ export async function runExplainerWorkflow(input: {
                 contentType: "image/jpeg",
                 ...(lease ? { stageAttemptId: lease.stageAttemptId, leaseOwner: lease.leaseOwner } : {}),
               });
-              const { url } = await uploadThumbnailToS3(data, input.pipelineId);
-              await saveThumbnailUrl(input.pipelineId, input.userId, url);
-              await syncCost();
+              const { url } = await runWithActiveStageLease(
+                lease,
+                () => uploadThumbnailToS3(data, input.pipelineId),
+              );
+              await saveThumbnailUrl(input.pipelineId, input.userId, url, lease);
+              await syncCost(lease);
               return { artifactKey };
             } catch (error) {
-              await syncCost();
+              await syncCost(lease);
               console.warn(`[pipeline:${input.pipelineId}] thumbnail skipped:`, error);
               return { skipped: true };
             }
@@ -303,18 +310,29 @@ export async function runExplainerWorkflow(input: {
               pipelineId: input.pipelineId, userId: input.userId,
               artifactKey: rendered.artifactKey, destination: finalPath,
             });
-            const { key } = await uploadToS3(finalPath, input.pipelineId);
-            await saveVideoOutput(input.pipelineId, input.userId, key, rendered.durationSeconds);
-            await syncCost();
+            const { key } = await runWithActiveStageLease(
+              lease,
+              () => uploadToS3(finalPath, input.pipelineId),
+            );
+            await saveVideoOutput(
+              input.pipelineId,
+              input.userId,
+              key,
+              rendered.durationSeconds,
+              lease,
+            );
+            await syncCost(lease);
             return { s3key: key, durationSeconds: rendered.durationSeconds };
           }
           case "notify": {
             const user = await getUser(input.userId);
             if (user) {
               const { subject, html } = reelReadyEmailTemplate(user.name, pipeline.topic);
-              await emailQueue.add("reel-ready", { to: user.email, subject, html }, {
-                jobId: reelReadyNotificationJobId(input.pipelineId),
-              });
+              await runWithActiveStageLease(lease, () => emailQueue.add(
+                "reel-ready",
+                { to: user.email, subject, html },
+                { jobId: reelReadyNotificationJobId(input.pipelineId) },
+              ));
             }
             return { queued: Boolean(user) };
           }
@@ -325,9 +343,12 @@ export async function runExplainerWorkflow(input: {
             const hashtags = finalScript.hashtags
               .map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ");
             const title = `${finalScript.titleOptions[0]!} ${hashtags}`.trim();
-            const publishId = await uploadToTiktokService(
-              input.userId, input.pipelineId, title, "PUBLIC_TO_EVERYONE",
-              false, false, false, false, false, true,
+            const publishId = await runWithActiveStageLease(
+              lease,
+              () => uploadToTiktokService(
+                input.userId, input.pipelineId, title, "PUBLIC_TO_EVERYONE",
+                false, false, false, false, false, true, lease,
+              ),
             );
             return { publishId };
           }

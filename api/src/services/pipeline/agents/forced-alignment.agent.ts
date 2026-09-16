@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import { beginProviderAttempt, finishProviderAttempt } from "../../../repositories/provider-usage.repository";
 import { calculateAlignmentCost } from "../../../utils/cost.util";
 import { providerCallBudget } from "../budget-policy.service";
-import type { MeteringContext } from "../llm-metering";
+import { assertProviderCallOwned, type MeteringContext } from "../llm-metering";
 
 export const forcedAlignmentAgent = async (
   audioFilePath: string,
@@ -27,6 +27,7 @@ export const forcedAlignmentAgent = async (
       throw error;
     }
   }
+  await assertProviderCallOwned(context, attemptId, reservation);
   try {
     const result = await elevenLabsClient.forcedAlignment.create({
       file: fs.createReadStream(audioFilePath), text: voiceoverText,

@@ -3,12 +3,12 @@ import {
   EXPLAINER_WORKFLOW_VERSION,
   type ExplainerStage,
 } from "../../helpers/workflow.helper";
+import {
+  WorkflowLeaseLostError,
+  type WorkflowLeaseGuard,
+} from "../../types/workflow-lease.types";
 
-export interface WorkflowStageLease {
-  stageAttemptId: string;
-  leaseOwner: string;
-  assertOwned(): Promise<void>;
-}
+export interface WorkflowStageLease extends WorkflowLeaseGuard {}
 
 export type StageClaim = {
   state: "claimed" | "succeeded" | "in_progress";
@@ -68,8 +68,13 @@ export function isWorkflowContentionError(error: unknown): boolean {
     || (error instanceof Error && error.name === "WorkflowAlreadyRunningError");
 }
 
+export function isWorkflowLeaseLostError(error: unknown): boolean {
+  return error instanceof WorkflowLeaseLostError
+    || (error instanceof Error && error.name === "WorkflowLeaseLostError");
+}
+
 export function shouldMarkPipelineFailed(error: unknown): boolean {
-  return !isWorkflowContentionError(error);
+  return !isWorkflowContentionError(error) && !isWorkflowLeaseLostError(error);
 }
 
 /** Single create/resume path. Checkpoints decide which work is reused. */

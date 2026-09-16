@@ -6,7 +6,7 @@ import type { AgentResult } from "../../../types/usage.types";
 import { randomUUID } from "crypto";
 import { beginProviderAttempt, finishProviderAttempt } from "../../../repositories/provider-usage.repository";
 import { estimateImageCost } from "../../../utils/cost.util";
-import { meteredAnthropicCall, type MeteringContext } from "../llm-metering";
+import { assertProviderCallOwned, meteredAnthropicCall, type MeteringContext } from "../llm-metering";
 import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
 import { providerCallBudget } from "../budget-policy.service";
 
@@ -54,6 +54,7 @@ export const generateThumbnailOpenRouter = async (
       throw error;
     }
   }
+  await assertProviderCallOwned(context, imageAttemptId, imageReservation);
   let result;
   try {
     result = await openRouterClient.images.generate({
@@ -84,6 +85,7 @@ export const generateThumbnailOpenRouter = async (
     costProvenance: imageCost === null ? "unknown" : "estimated",
     rateVersion: imageCost === null ? null : "planning-2026-09-14" });
   if (imageReservation) await context!.budget!.finalize(imageReservation, { providerCalls: 1 });
+  await context?.lease?.assertOwned();
 
   return {
     data: Buffer.from(b64, "base64"),
