@@ -38,4 +38,5 @@ The frontend now sends the selected type-specific input, renders Story/List stru
 Phase 3 review corrections:
 
 - Scene `onScreenText` is now a real timed composition input. List validation requires each item overlay to include its number, the shared renderer draws those number/label overlays separately from bottom narration captions, and an FFmpeg regression test verifies visible overlay pixels in the delivered frame.
+- Timed scene overlays stay anchored to the assembled generated-video timeline. They are not rescaled when narration duration differs from planned scene duration; the FFmpeg regression covers a 0.6-second visual timeline with 0.9-second narration and checks both the intended visible window and the later absent window.
 - Fictional Story narration must contain its approved `disclosureNp` verbatim. Video-spec validation cross-checks that same approved disclosure against the TTS `voiceoverText`, so a fictional disclosure cannot remain only in metadata.

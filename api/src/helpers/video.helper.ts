@@ -126,20 +126,6 @@ function scaleCaptions(captions: Caption[], actualDuration: number): Caption[] {
   }));
 }
 
-function scaleTimedOverlays(
-  overlays: Caption[],
-  actualDuration: number,
-  plannedDuration: number,
-): Caption[] {
-  if (overlays.length === 0) return [];
-  const scale = actualDuration / plannedDuration;
-  return overlays.map((overlay) => ({
-    ...overlay,
-    startSec: overlay.startSec * scale,
-    endSec: overlay.endSec * scale,
-  }));
-}
-
 export async function burnThumbnailIntoVideo(
   videoPath: string,
   thumbnailBuffer: Buffer,
@@ -227,7 +213,6 @@ export async function compositeVideo(
   captions: Caption[],
   videoInputPath: string,
   timedOverlays: Caption[] = [],
-  plannedDurationSeconds?: number,
 ): Promise<string> {
   const audioInput = `src/audio/${pipelineId}.wav`;
   const output = `src/video/${pipelineId}-output.mp4`;
@@ -240,14 +225,12 @@ export async function compositeVideo(
   const duration = await getAudioDuration(audioInput);
 
   const scaled = scaleCaptions(captions, duration);
-  const scaledOverlays = scaleTimedOverlays(
-    timedOverlays,
-    duration,
-    plannedDurationSeconds ?? duration,
-  );
   await fs.promises.mkdir(temporaryFrameDir, { recursive: true });
   const captionFrames = await renderCaptionFrames(scaled, temporaryFrameDir);
-  const overlayFrames = await renderOverlayFrames(scaledOverlays, temporaryFrameDir);
+  // Scene overlays are keyed to the assembled background timeline. Narration
+  // duration can differ, but rescaling only the overlays would move a label
+  // onto a different generated scene.
+  const overlayFrames = await renderOverlayFrames(timedOverlays, temporaryFrameDir);
   const frames = [...captionFrames, ...overlayFrames];
 
   // [0:v] scale+pad → [base]; then chain overlays: [base][2:v]overlay→[v1], [v1][3:v]overlay→[v2], ...

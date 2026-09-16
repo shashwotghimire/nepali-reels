@@ -60,9 +60,9 @@ async function assertNoTemporaryFiles(
   );
 }
 
-async function topFrameLumaRange(filePath: string): Promise<number> {
+async function topFrameLumaRange(filePath: string, atSeconds = 0.3): Promise<number> {
   const { stdout, stderr } = await execFileAsync("ffmpeg", [
-    "-ss", "0.3", "-i", filePath,
+    "-ss", atSeconds.toString(), "-i", filePath,
     "-vf", "crop=720:360:0:0,signalstats,metadata=mode=print",
     "-frames:v", "1", "-f", "null", "-",
   ]);
@@ -155,7 +155,7 @@ test("final compositing and thumbnail insertion are replay-safe", async (t) => {
       "-f",
       "lavfi",
       "-i",
-      "sine=frequency=330:sample_rate=44100:duration=0.6",
+      "sine=frequency=330:sample_rate=44100:duration=0.9",
       audioPath,
     ]),
     ffmpeg([
@@ -170,17 +170,23 @@ test("final compositing and thumbnail insertion are replay-safe", async (t) => {
   ]);
 
   await fs.promises.writeFile(compositeOutput, "interrupted composite");
-  const captions = [{ text: "Replay safe", startSec: 0, endSec: 0.6 }];
-  const timedOverlays = [{ text: "3 · Timed item", startSec: 0, endSec: 0.6 }];
+  const captions = [{ text: "Replay safe", startSec: 0, endSec: 0.9 }];
+  // The visual timeline is 0.6s while narration lasts 0.9s. This item belongs
+  // to the visual scene at 0.2–0.4s and must not be shifted to 0.3–0.6s.
+  const timedOverlays = [{ text: "3 · Timed item", startSec: 0.2, endSec: 0.4 }];
   assert.equal(
-    await compositeVideo(pipelineId, captions, sourceVideo, timedOverlays, 0.6),
+    await compositeVideo(pipelineId, captions, sourceVideo, timedOverlays),
     `src/video/${pipelineId}-output.mp4`,
   );
-  await compositeVideo(pipelineId, captions, sourceVideo, timedOverlays, 0.6);
+  await compositeVideo(pipelineId, captions, sourceVideo, timedOverlays);
   await validateFinalVideo(compositeOutput, 1);
   assert.ok(
-    await topFrameLumaRange(compositeOutput) > 100,
-    "timed overlay was not visibly composited into the top of the delivered frame",
+    await topFrameLumaRange(compositeOutput, 0.25) > 100,
+    "timed overlay did not appear during its generated visual scene",
+  );
+  assert.ok(
+    await topFrameLumaRange(compositeOutput, 0.55) < 40,
+    "timed overlay drifted beyond its generated visual scene",
   );
 
   const thumbnail = await fs.promises.readFile(thumbnailPath);
