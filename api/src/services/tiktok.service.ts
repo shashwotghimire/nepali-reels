@@ -13,6 +13,19 @@ import {
 import { ApiError } from "../utils/ApiError.util";
 import { enqueueTiktokStatusPoll } from "../queue/tiktok.queue";
 import type { WorkflowLeaseGuard } from "../types/workflow-lease.types";
+import {
+  beginStageProviderSubmission,
+  clearStageProviderSubmission,
+} from "../repositories/workflow-execution.repository";
+
+export class TiktokSubmissionUncertainError extends Error {
+  constructor() {
+    super(
+      "TikTok submission may have been accepted before its publish ID was persisted; automatic resubmission is blocked to prevent a duplicate post",
+    );
+    this.name = "TiktokSubmissionUncertainError";
+  }
+}
 
 export const buildAuthUrl = () => {
   const state = generateToken();
@@ -226,6 +239,11 @@ export const uploadToTiktokService = async (
     throw new ApiError(404, "Pipeline not found", "PIPELINE_NOT_FOUND");
   }
 
+  if (pipeline.tiktokPublishId) {
+    await enqueueTiktokStatusPoll(pipeline.tiktokPublishId, pipelineId, userId);
+    return pipeline.tiktokPublishId;
+  }
+
   if (pipeline.pipelineStatus !== "video_generated") {
     throw new ApiError(
       400,
@@ -277,6 +295,20 @@ export const uploadToTiktokService = async (
   };
 
   await lease?.assertOwned();
+  let providerAttemptId: string | undefined;
+  if (lease) {
+    const submission = await beginStageProviderSubmission({
+      pipelineId,
+      userId,
+      stageAttemptId: lease.stageAttemptId,
+      leaseOwner: lease.leaseOwner,
+      stage: "publish",
+    });
+    if (submission.disposition === "uncertain") {
+      throw new TiktokSubmissionUncertainError();
+    }
+    providerAttemptId = submission.providerAttemptId;
+  }
   const res = await fetch(
     "https://open.tiktokapis.com/v2/post/publish/video/init/",
     {
@@ -296,6 +328,13 @@ export const uploadToTiktokService = async (
   );
   const data = await res.json();
   if (data.error?.code !== "ok") {
+    if (lease && providerAttemptId) {
+      await clearStageProviderSubmission({
+        stageAttemptId: lease.stageAttemptId,
+        leaseOwner: lease.leaseOwner,
+        providerAttemptId,
+      });
+    }
     throw new ApiError(
       400,
       `TikTok init failed: ${data.error.code} — ${data.error.message}`,

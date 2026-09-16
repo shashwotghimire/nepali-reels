@@ -59,6 +59,7 @@ import { createExplainerDurationPolicy } from "./explainer-duration-policy.servi
 import type { MeteringContext } from "./llm-metering";
 import type { WorkflowStageLease } from "./workflow-dispatcher.service";
 import { runWithActiveStageLease } from "./workflow-lease.service";
+import { attemptAutoPublish } from "./auto-publish.service";
 
 type StageOutput = Record<string, unknown>;
 
@@ -338,19 +339,20 @@ export async function runExplainerWorkflow(input: {
           }
           case "publish": {
             if (!input.autoPublish) return { skipped: true };
-            const finalScript = pipeline.finalScript as ScriptOutput | null;
-            if (!finalScript) throw new Error("Final script is unavailable for publishing");
-            const hashtags = finalScript.hashtags
-              .map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ");
-            const title = `${finalScript.titleOptions[0]!} ${hashtags}`.trim();
-            const publishId = await runWithActiveStageLease(
-              lease,
-              () => uploadToTiktokService(
-                input.userId, input.pipelineId, title, "PUBLIC_TO_EVERYONE",
-                false, false, false, false, false, true, lease,
-              ),
-            );
-            return { publishId };
+            return attemptAutoPublish(input.pipelineId, async () => {
+              const finalScript = pipeline.finalScript as ScriptOutput | null;
+              if (!finalScript) throw new Error("Final script is unavailable for publishing");
+              const hashtags = finalScript.hashtags
+                .map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ");
+              const title = `${finalScript.titleOptions[0]!} ${hashtags}`.trim();
+              return runWithActiveStageLease(
+                lease,
+                () => uploadToTiktokService(
+                  input.userId, input.pipelineId, title, "PUBLIC_TO_EVERYONE",
+                  false, false, false, false, false, true, lease,
+                ),
+              );
+            });
           }
         }
       },
