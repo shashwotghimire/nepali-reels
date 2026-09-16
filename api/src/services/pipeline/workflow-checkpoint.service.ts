@@ -11,8 +11,8 @@ import { randomUUID } from "node:crypto";
 import {
   EXPLAINER_WORKFLOW_VERSION,
   inferLegacyCompletedStages,
-  type ExplainerStage,
   type LegacyPipelineProgress,
+  type WorkflowStage,
 } from "../../helpers/workflow.helper";
 import type { WorkflowCheckpointPort } from "./workflow-dispatcher.service";
 import fs from "node:fs";
@@ -93,7 +93,7 @@ export function createWorkflowCheckpointPort(
 ): WorkflowCheckpointPort {
   // BullMQ reuses a job id when the same queue job is replayed. A fresh token
   // per port instance fences the prior worker incarnation even in that case.
-  const claimedIds = new Map<ExplainerStage, string>();
+  const claimedIds = new Map<WorkflowStage, string>();
   return {
     leaseRenewalIntervalMs: Math.floor(STAGE_LEASE_MS / 3),
     async claim(input) {

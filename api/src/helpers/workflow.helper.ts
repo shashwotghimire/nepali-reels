@@ -1,6 +1,8 @@
 import type { PipelineStatus } from "../types/pipeline.types";
 
 export const EXPLAINER_WORKFLOW_VERSION = 1 as const;
+export const STORY_WORKFLOW_VERSION = 1 as const;
+export const LIST_WORKFLOW_VERSION = 1 as const;
 
 export const EXPLAINER_STAGES = [
   "script",
@@ -18,6 +20,46 @@ export const EXPLAINER_STAGES = [
 ] as const;
 
 export type ExplainerStage = (typeof EXPLAINER_STAGES)[number];
+
+export const STORY_STAGES = [
+  "story_script",
+  "story_continuity",
+  "story_fact_safety",
+  "story_video_spec",
+  "audio",
+  "alignment",
+  "video",
+  "thumbnail",
+  "render",
+  "upload",
+  "notify",
+  "publish",
+] as const;
+
+export const LIST_STAGES = [
+  "list_script",
+  "list_structure",
+  "list_fact_check",
+  "list_video_spec",
+  "audio",
+  "alignment",
+  "video",
+  "thumbnail",
+  "render",
+  "upload",
+  "notify",
+  "publish",
+] as const;
+
+export type StoryStage = (typeof STORY_STAGES)[number];
+export type ListStage = (typeof LIST_STAGES)[number];
+export type WorkflowStage = ExplainerStage | StoryStage | ListStage;
+
+export const WORKFLOW_STAGES_BY_TYPE = {
+  explainer: EXPLAINER_STAGES,
+  story: STORY_STAGES,
+  list: LIST_STAGES,
+} as const;
 
 export interface LegacyPipelineProgress {
   pipelineStatus: PipelineStatus;

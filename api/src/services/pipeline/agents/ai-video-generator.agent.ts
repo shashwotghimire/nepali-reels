@@ -321,6 +321,7 @@ export async function generateAiVideoClips(
   pipelineId: string,
   videoModel: VideoModel,
   context?: MeteringContext,
+  workflowVersion: number = EXPLAINER_WORKFLOW_VERSION,
 ): Promise<string> {
   if (!context?.budget) {
     throw new Error("AI video generation requires a trusted provider budget context");
@@ -347,17 +348,18 @@ export async function generateAiVideoClips(
       const fingerprint = stableFingerprint({
         scene,
         model,
+        workflowVersion,
         aspectRatio: "9:16",
         resolution: "480p",
         generateAudio: false,
       });
       const stateKey = workflowArtifactKey(
-        EXPLAINER_WORKFLOW_VERSION,
+        workflowVersion,
         "video-scene-state",
         String(sceneIndex),
       );
       const clipKey = workflowArtifactKey(
-        EXPLAINER_WORKFLOW_VERSION,
+        workflowVersion,
         "video-scene",
         String(sceneIndex),
       );

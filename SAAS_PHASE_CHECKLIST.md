@@ -2,7 +2,7 @@
 
 - [x] Phase 1: plan, entitlements, usage ledger, cost estimates, budget policy, mocked tests and builds (approved in code review)
 - [x] Phase 2: shared Explainer workflow, durable checkpoints and enforceable resource budgets (approved in independent code review)
-- [ ] Phase 3: Story and List workflows
+- [x] Phase 3: Story and List workflows (implemented; awaiting user review)
 - [ ] Phase 4: paid creation features
 - [ ] Phase 5: subscriptions and allowances
 - [ ] Phase 6: launch validation
@@ -28,3 +28,15 @@ Phase 2 review corrections:
 - Non-video provider calls and retries recheck lease ownership immediately before invocation; reel result/status writes are transactionally fenced, and upload, notification, and publishing side effects require an active stage lease.
 
 One provider boundary cannot be made fully automatic: after the durable `submitting` marker is written and before the returned provider job ID is persisted, a crash can leave the application unable to tell whether no request was sent or the provider accepted it. The workflow retains the reservation and pending usage record and blocks resubmission. An operator must reconcile that scene to avoid duplicate spend.
+
+Phase 3 adds immutable version-1 Story and List/Countdown workflow definitions without changing Explainer version 1. Creation persists a discriminated `contentInput`: Story requires an explicit factual or fictional treatment; List requires an item count from 3–10 and ascending or descending order. Story generation validates recurring character/location continuity, story composition, sourced claims for factual treatments, and an explicit disclosure for fictional treatments. Fictional plot content does not enable search tools. List generation validates exact item counts, unique labels, consecutive visible numbering in the requested direction, ranking basis, and one composed scene per numbered item.
+
+Story and List use dedicated script/review/video-spec prompts and stage orders, then share the budgeted and lease-fenced TTS, forced alignment, AI-video scene generation, thumbnail, FFmpeg render, durable artifact, upload, notification, and reel-level TikTok submission paths. Their resource ceilings and duration/thumbnail policy continue to come from trusted server-side generation access; Phase 3 does not implement billing or accept a client-supplied plan. Retry checkpoints, artifacts, failure transitions, and scene work use the persisted workflow version. Existing Explainer rows and legacy adoption remain version-1 compatible.
+
+The frontend now sends the selected type-specific input, renders Story/List structures, shows reel-type badges, and displays persisted stage-level progress. Checked-in factual Story, fictional Story, and countdown fixtures cover valid output plus continuity, disclosure, numbering, timing, and ambiguous-input failures. The local visual-review fixture was inspected at a narrow responsive viewport. No live provider generation, live migration, deployment, or publication was run. The Phase 3 verification baseline is 81 passing backend tests plus successful API and web production builds; repository-wide web lint still reports eight pre-existing errors in shared UI/hooks outside the Phase 3 changes.
+
+Phase 3 review corrections:
+
+- Scene `onScreenText` is now a real timed composition input. List validation requires each item overlay to include its number, the shared renderer draws those number/label overlays separately from bottom narration captions, and an FFmpeg regression test verifies visible overlay pixels in the delivered frame.
+- Timed scene overlays stay anchored to the assembled generated-video timeline. They are not rescaled when narration duration differs from planned scene duration; the FFmpeg regression covers a 0.6-second visual timeline with 0.9-second narration and checks both the intended visible window and the later absent window.
+- Fictional Story narration must contain its approved `disclosureNp` verbatim. Video-spec validation cross-checks that same approved disclosure against the TTS `voiceoverText`, so a fictional disclosure cannot remain only in metadata.

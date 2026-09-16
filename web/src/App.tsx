@@ -11,11 +11,16 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PublicRoute from "./components/auth/PublicRoute";
 import AppLayout from "./components/common/AppLayout";
+import Phase3VisualReview from "./pages/Phase3VisualReview";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route
+          path="/__phase3-review"
+          element={import.meta.env.DEV ? <Phase3VisualReview /> : <NotFound />}
+        />
         <Route element={<PublicRoute />}>
           <Route path="/" element={<Landing />} />
           <Route path="/terms" element={<TermsOfService />} />

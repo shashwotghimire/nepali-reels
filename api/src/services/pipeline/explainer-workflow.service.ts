@@ -38,6 +38,7 @@ import { uploadToTiktokService } from "../tiktok.service";
 import {
   EXPLAINER_WORKFLOW_VERSION,
   type ExplainerStage,
+  type WorkflowStage,
 } from "../../helpers/workflow.helper";
 import {
   stableFingerprint,
@@ -64,7 +65,7 @@ import { attemptAutoPublish } from "./auto-publish.service";
 type StageOutput = Record<string, unknown>;
 
 function output<T extends StageOutput>(
-  outputs: ReadonlyMap<ExplainerStage, object | null>,
+  outputs: ReadonlyMap<WorkflowStage, object | null>,
   stage: ExplainerStage,
 ): T | null {
   return (outputs.get(stage) as T | null | undefined) ?? null;
@@ -82,6 +83,9 @@ export async function runExplainerWorkflow(input: {
   if (!initial) throw new ApiError(404, "Pipeline not found", "Not found");
   if (initial.videoType !== "explainer") {
     throw new Error(`Unsupported video type ${initial.videoType}`);
+  }
+  if (initial.workflowVersion !== EXPLAINER_WORKFLOW_VERSION) {
+    throw new Error(`Unsupported explainer workflow version ${initial.workflowVersion}`);
   }
   await seedLegacyExplainerCheckpoints({
     pipelineId: input.pipelineId,

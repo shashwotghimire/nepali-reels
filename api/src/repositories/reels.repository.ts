@@ -5,7 +5,9 @@ import Reels from "../models/reels.model";
 import WorkflowStageAttempt from "../models/workflow-stage-attempt.model";
 import { ScriptOutput } from "../schema/script-writer.schema";
 import { VideoSpec } from "../schema/video-spec.schema";
-import { PipelineStatus } from "../types/pipeline.types";
+import type { StoryScriptOutput, StoryVideoSpec } from "../schema/story.schema";
+import type { ListScriptOutput, ListVideoSpec } from "../schema/list.schema";
+import type { PipelineContentInput, PipelineStatus, VideoType } from "../types/pipeline.types";
 import {
   WorkflowLeaseLostError,
   type WorkflowLeaseWriteFence,
@@ -76,6 +78,8 @@ export const createPipeline = (
   claudeModel: string,
   videoModel: string,
   ttsVoice?: string,
+  videoType: VideoType = "explainer",
+  contentInput: PipelineContentInput = { videoType: "explainer" },
 ) => {
   return Reels.create({
     userId,
@@ -83,6 +87,9 @@ export const createPipeline = (
     claudeModel,
     videoModel,
     ttsVoice: ttsVoice ?? "aoede",
+    videoType,
+    contentInput,
+    workflowVersion: 1,
     pipelineStatus: "queued",
   });
 };
@@ -90,7 +97,7 @@ export const createPipeline = (
 export const saveDraftScript = async (
   pipelineId: string,
   userId: string,
-  draftScript: ScriptOutput,
+  draftScript: ScriptOutput | StoryScriptOutput | ListScriptOutput,
   lease?: WorkflowLeaseWriteFence,
 ) => {
   await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
@@ -102,7 +109,7 @@ export const saveDraftScript = async (
 export const saveFinalScript = async (
   pipelineId: string,
   userId: string,
-  finalScript: ScriptOutput,
+  finalScript: ScriptOutput | StoryScriptOutput | ListScriptOutput,
   lease?: WorkflowLeaseWriteFence,
 ) => {
   await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
@@ -114,7 +121,7 @@ export const saveFinalScript = async (
 export const saveLinguisticReview = async (
   pipelineId: string,
   userId: string,
-  finalScript: ScriptOutput,
+  finalScript: ScriptOutput | StoryScriptOutput | ListScriptOutput,
   lease?: WorkflowLeaseWriteFence,
 ) => {
   await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
@@ -126,7 +133,7 @@ export const saveLinguisticReview = async (
 export const saveVideoSpec = async (
   pipelineId: string,
   userId: string,
-  videoSpec: VideoSpec,
+  videoSpec: VideoSpec | StoryVideoSpec | ListVideoSpec,
   lease?: WorkflowLeaseWriteFence,
 ) => {
   await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
