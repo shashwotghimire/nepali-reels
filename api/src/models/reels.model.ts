@@ -19,6 +19,8 @@ export class Reels extends Model<
   declare topic: string;
   declare claudeModel: string;
   declare videoModel: string;
+  declare videoType: CreationOptional<"explainer">;
+  declare workflowVersion: CreationOptional<number>;
   declare draftScript: CreationOptional<object | null>;
   declare finalScript: CreationOptional<object | null>;
   declare videoSpec: CreationOptional<object | null>;
@@ -27,8 +29,12 @@ export class Reels extends Model<
   declare videoDurationSec: CreationOptional<number | null>;
   declare s3key: CreationOptional<string | null>;
   declare tiktokPublishId: CreationOptional<string | null>;
+  declare tiktokSubmissionState: CreationOptional<"submitting" | "submitted" | null>;
+  declare tiktokSubmissionAttemptId: CreationOptional<string | null>;
   declare thumbnailUrl: CreationOptional<string | null>;
   declare costUsd: CreationOptional<number | null>;
+  declare legacyCostUsd: CreationOptional<number | null>;
+  declare costEstimateIncomplete: CreationOptional<boolean>;
   declare ttsVoice: CreationOptional<string | null>;
   declare failureReason: CreationOptional<string | null>;
   declare createdAt: CreationOptional<Date>;
@@ -60,6 +66,16 @@ Reels.init(
     videoModel: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    videoType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: "explainer",
+    },
+    workflowVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
     },
     draftScript: {
       type: DataTypes.JSONB,
@@ -105,6 +121,14 @@ Reels.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    tiktokSubmissionState: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    tiktokSubmissionAttemptId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
     thumbnailUrl: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -112,6 +136,15 @@ Reels.init(
     costUsd: {
       type: DataTypes.FLOAT,
       allowNull: true,
+    },
+    legacyCostUsd: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    costEstimateIncomplete: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
     },
     ttsVoice: {
       type: DataTypes.STRING,

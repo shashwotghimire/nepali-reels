@@ -2,12 +2,15 @@ import { VideoSpec } from "../schema/video-spec.schema";
 import {
   AI_VIDEO_MIN_SCENE_DURATION,
   AI_VIDEO_MAX_SCENE_DURATION,
-  AI_VIDEO_MIN_TOTAL_DURATION,
   AI_VIDEO_MAX_TOTAL_DURATION,
   AI_VIDEO_SCENE_CONTIGUITY_TOLERANCE,
 } from "../constants/constant";
 
-export function validateVideoSpec(spec: VideoSpec): void {
+export function validateVideoSpec(
+  spec: VideoSpec,
+  maximumTotalDuration = AI_VIDEO_MAX_TOTAL_DURATION,
+  minimumTotalDuration = 12,
+): void {
   const { scenes } = spec;
 
   if (scenes.length === 0) {
@@ -55,9 +58,9 @@ export function validateVideoSpec(spec: VideoSpec): void {
 
   const totalDuration = scenes[scenes.length - 1]!.endSec;
 
-  if (totalDuration < AI_VIDEO_MIN_TOTAL_DURATION || totalDuration > AI_VIDEO_MAX_TOTAL_DURATION) {
+  if (totalDuration < minimumTotalDuration || totalDuration > maximumTotalDuration) {
     throw new Error(
-      `VideoSpec validation failed: total duration ${totalDuration.toFixed(2)}s must be between ${AI_VIDEO_MIN_TOTAL_DURATION}s and ${AI_VIDEO_MAX_TOTAL_DURATION}s`,
+      `VideoSpec validation failed: total duration ${totalDuration.toFixed(2)}s must be between ${minimumTotalDuration}s and ${maximumTotalDuration}s`,
     );
   }
 }

@@ -1,6 +1,8 @@
 import { execFile } from "child_process";
+import { randomUUID } from "crypto";
 import { promisify } from "util";
 import fs from "fs";
+import path from "path";
 import type { Caption } from "../types/subtitle.types";
 import { renderCaptionFrames, cleanupCaptionFrames } from "./subtitle-renderer";
 import {
@@ -10,6 +12,28 @@ import {
 } from "../constants/constant";
 
 const execFileAsync = promisify(execFile);
+
+function temporarySiblingPath(filePath: string): string {
+  const extension = path.extname(filePath);
+  const basename = path.basename(filePath, extension);
+  return path.join(
+    path.dirname(filePath),
+    `.${basename}.${process.pid}-${randomUUID()}.tmp${extension}`,
+  );
+}
+
+async function replaceWithFfmpegOutput(
+  outputPath: string,
+  args: string[],
+): Promise<void> {
+  const temporaryPath = temporarySiblingPath(outputPath);
+  try {
+    await execFileAsync("ffmpeg", ["-nostdin", "-y", ...args, temporaryPath]);
+    await fs.promises.rename(temporaryPath, outputPath);
+  } finally {
+    await fs.promises.unlink(temporaryPath).catch(() => {});
+  }
+}
 
 export async function getVideoDuration(filePath: string): Promise<number> {
   const { stdout } = await execFileAsync("ffprobe", [
@@ -37,7 +61,10 @@ async function getAudioDuration(audioPath: string): Promise<number> {
   return parseFloat(stdout.trim());
 }
 
-export async function validateFinalVideo(filePath: string): Promise<void> {
+export async function validateFinalVideo(
+  filePath: string,
+  maximumDurationSeconds = AI_VIDEO_MAX_TOTAL_DURATION + 1,
+): Promise<void> {
   const { stdout } = await execFileAsync("ffprobe", [
     "-v",
     "error",
@@ -75,9 +102,9 @@ export async function validateFinalVideo(filePath: string): Promise<void> {
   if (pixFmt !== "yuv420p") errors.push(`pix_fmt=${pixFmt} (expected yuv420p)`);
   if (Math.abs(fps - 30) > 0.1)
     errors.push(`fps=${fps.toFixed(2)} (expected 30)`);
-  if (duration > AI_VIDEO_MAX_TOTAL_DURATION + 1) {
+  if (duration > maximumDurationSeconds) {
     errors.push(
-      `duration=${duration.toFixed(2)}s (expected ≤${AI_VIDEO_MAX_TOTAL_DURATION + 1}s)`,
+      `duration=${duration.toFixed(2)}s (expected ≤${maximumDurationSeconds}s)`,
     );
   }
 
@@ -106,8 +133,11 @@ export async function burnThumbnailIntoVideo(
 ): Promise<string> {
   const thumbPath = `src/video/${pipelineId}-thumb.jpg`;
   const output = `src/video/${pipelineId}-with-thumb.mp4`;
+  const temporaryThumbPath = temporarySiblingPath(thumbPath);
 
-  await fs.promises.writeFile(thumbPath, thumbnailBuffer);
+  await fs.promises.writeFile(temporaryThumbPath, thumbnailBuffer, {
+    flag: "wx",
+  });
 
   try {
     // input 0: thumbnail image (looped for 1s)
@@ -130,13 +160,13 @@ export async function burnThumbnailIntoVideo(
     const sampleRate = srMatch ? srMatch[1] : "44100";
     const channelLayout = clMatch ? clMatch[1] : "stereo";
 
-    await execFileAsync("ffmpeg", [
+    await replaceWithFfmpegOutput(output, [
       "-loop",
       "1",
       "-t",
       "1",
       "-i",
-      thumbPath,
+      temporaryThumbPath,
       "-i",
       videoPath,
       "-f",
@@ -170,10 +200,9 @@ export async function burnThumbnailIntoVideo(
       "aac",
       "-movflags",
       "+faststart",
-      output,
     ]);
   } finally {
-    await fs.promises.unlink(thumbPath).catch(() => {});
+    await fs.promises.unlink(temporaryThumbPath).catch(() => {});
   }
 
   return output;
@@ -187,11 +216,16 @@ export async function compositeVideo(
   const audioInput = `src/audio/${pipelineId}.wav`;
   const output = `src/video/${pipelineId}-output.mp4`;
   const frameDir = `src/video/${pipelineId}`;
+  const temporaryFrameDir = path.join(
+    frameDir,
+    `.captions.${process.pid}-${randomUUID()}`,
+  );
 
   const duration = await getAudioDuration(audioInput);
 
   const scaled = scaleCaptions(captions, duration);
-  const frames = await renderCaptionFrames(scaled, frameDir);
+  await fs.promises.mkdir(temporaryFrameDir, { recursive: true });
+  const frames = await renderCaptionFrames(scaled, temporaryFrameDir);
 
   // [0:v] scale+pad → [base]; then chain overlays: [base][2:v]overlay→[v1], [v1][3:v]overlay→[v2], ...
   // Input indices: 0=video, 1=audio, 2..N=caption PNGs
@@ -220,7 +254,7 @@ export async function compositeVideo(
   for (const f of frames) inputArgs.push("-i", f.pngPath);
 
   try {
-    await execFileAsync("ffmpeg", [
+    await replaceWithFfmpegOutput(output, [
       ...inputArgs,
       "-filter_complex",
       filterComplex,
@@ -240,10 +274,10 @@ export async function compositeVideo(
       "+faststart",
       "-t",
       duration.toString(),
-      output,
     ]);
   } finally {
     await cleanupCaptionFrames(frames);
+    await fs.promises.rm(temporaryFrameDir, { recursive: true, force: true });
   }
 
   return output;

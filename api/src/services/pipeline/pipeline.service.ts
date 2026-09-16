@@ -1,596 +1,104 @@
-import fs from "fs";
+import { randomUUID } from "node:crypto";
+import { STANDARD_GENERATION } from "../../commercial/policy";
 import {
   createPipeline,
   findPipelineById,
-  markPipelineAsFailed,
   resetPipelineForRetry,
-  saveAudioSpec,
-  saveDraftScript,
-  saveFinalScript,
-  saveLinguisticReview,
-  savePipelineCost,
-  saveVideoOutput,
-  saveVideoSpec,
 } from "../../repositories/reels.repository";
-import { PipelineStatus } from "../../types/pipeline.types";
+import type { PipelineStatus } from "../../types/pipeline.types";
 import { ApiError } from "../../utils/ApiError.util";
-import { factCheckerAgent } from "../pipeline/agents/fact-checker.agent";
-import { linguisticExpertAgent } from "../pipeline/agents/linguistic-expert.agent";
-import { scriptGeneratorAgent } from "../pipeline/agents/script-writer.agent";
-import { videoSpecGeneratorAgent } from "../pipeline/agents/video-spec-generator.agent";
-import { generateTextToSpeechAgent } from "./agents/tts.agent";
-import { forcedAlignmentAgent } from "./agents/forced-alignment.agent";
-import {
-  compositeVideo,
-  burnThumbnailIntoVideo,
-  validateFinalVideo,
-  getVideoDuration,
-} from "../../helpers/video.helper";
-import { uploadToS3, uploadThumbnailToS3 } from "../s3.service";
-import {
-  generateThumbnailAgent,
-  generateThumbnailOpenRouter,
-} from "./agents/thumbnail.agent";
-import { saveThumbnailUrl } from "../../repositories/reels.repository";
-import { validateVideoSpec } from "../../helpers/video-spec-validation.helper";
-import { generateAiVideoClips } from "./agents/ai-video-generator.agent";
-import { type VideoModel, type ClaudeModel } from "../../constants/constant";
-import {
-  calculateAlignmentCost,
-  calculateImageCost,
-  calculateLlmCost,
-  calculateTtsCost,
-  calculateVideoCost,
-} from "../../utils/cost.util";
-import type { LlmUsage } from "../../types/usage.types";
-import { emailQueue } from "../../queue/email.queue";
-import { getUser } from "../../repositories/user.repository";
-import { reelReadyEmailTemplate } from "../../utils/email-templates.util";
-import { uploadToTiktokService } from "../tiktok.service";
+import { inferLegacyCompletedStages } from "../../helpers/workflow.helper";
+import { resolveLegacyCompatibilityAccess } from "./entitlement-resolution.service";
+import { createWorkflowLeaseOwner } from "./workflow-checkpoint.service";
 
+/** New pipelines use the centrally configured standard generation models. */
 export const initPipelineService = async (
   userId: string,
   topic: string,
-  model: string,
-  videoModel: VideoModel,
+  _model?: string,
+  _videoModel?: string,
   ttsVoice?: string,
+) => createPipeline(
+  userId,
+  topic,
+  STANDARD_GENERATION.scriptModel,
+  STANDARD_GENERATION.videoModel,
+  ttsVoice,
+);
+
+export { markPipelineAsFailedService } from "./pipeline-failure.service";
+
+export const dispatchPipelineService = async (
+  userId: string,
+  pipelineId: string,
+  executionKey: string,
+  autoPublish = false,
+  leaseOwner = createWorkflowLeaseOwner(executionKey),
 ) => {
-  return await createPipeline(userId, topic, model, videoModel, ttsVoice);
+  const { runExplainerWorkflow } = await import("./explainer-workflow.service.js");
+  return runExplainerWorkflow({
+    userId,
+    pipelineId,
+    executionKey,
+    leaseOwner,
+    autoPublish,
+    access: resolveLegacyCompatibilityAccess(userId),
+  });
 };
 
 export const createPipelineService = async (
   userId: string,
   pipelineId: string,
-  topic: string,
-  model: string,
-  videoModel: VideoModel,
+  _topic?: string,
+  _model?: string,
+  _videoModel?: string,
   autoPublish = false,
-  ttsVoice = "aoede",
-) => {
-  console.log(
-    `[pipeline:${pipelineId}] starting pipeline for topic: "${topic}" with model: ${model}`,
-  );
+  _ttsVoice?: string,
+  executionKey = randomUUID(),
+) => dispatchPipelineService(userId, pipelineId, executionKey, autoPublish);
 
-  let runningCost = 0;
-
-  const addCost = async (amount: number) => {
-    runningCost += amount;
-    await savePipelineCost(pipelineId, userId, runningCost);
-    console.log(
-      `[pipeline:${pipelineId}] cost so far: $${runningCost.toFixed(6)}`,
-    );
-  };
-
-  console.log(`[pipeline:${pipelineId}] generating draft script...`);
-  const { data: draftScript, usage: scriptUsage } = await scriptGeneratorAgent(
-    topic,
-    model,
-  );
-  await saveDraftScript(pipelineId, userId, draftScript);
-  await addCost(calculateLlmCost(scriptUsage, model as ClaudeModel));
-  console.log(`draft script: \n${JSON.stringify(draftScript)}`);
-  console.log(`[pipeline:${pipelineId}] draft script saved`);
-
-  console.log(`[pipeline:${pipelineId}] running fact check...`);
-  const { data: factCheck, usage: factCheckUsage } = await factCheckerAgent(
-    draftScript,
-    model,
-  );
-  console.log(`final script: \n${JSON.stringify(factCheck)}`);
-  console.log(
-    `[pipeline:${pipelineId}] fact check verdict: ${factCheck?.verdict}`,
-  );
-
-  let finalScript;
-  if (factCheck?.verdict === "pass") {
-    finalScript = draftScript;
-  } else if (factCheck?.verdict === "revise") {
-    finalScript = factCheck.revisedScript!;
-  } else if (factCheck?.verdict === "unsafe") {
-    throw new ApiError(
-      400,
-      `Script is unsafe: ${JSON.stringify(factCheck.issues, null, 2)}`,
-      "Script is not safe.",
-    );
-  } else {
-    throw new ApiError(500, "Unexpected fact-check verdict", "Internal error");
-  }
-  await saveFinalScript(pipelineId, userId, finalScript);
-  await addCost(calculateLlmCost(factCheckUsage, model as ClaudeModel));
-  console.log(`[pipeline:${pipelineId}] final script saved`);
-
-  console.log(`[pipeline:${pipelineId}] running linguistic review...`);
-  const { data: linguisticReview, usage: linguisticUsage } =
-    await linguisticExpertAgent(finalScript, model);
-  console.log(
-    `[pipeline:${pipelineId}] linguistic review verdict: ${linguisticReview?.verdict}`,
-  );
-  if (linguisticReview?.verdict === "revise") {
-    finalScript = linguisticReview.revisedScript!;
-  }
-  await saveLinguisticReview(pipelineId, userId, finalScript);
-  await addCost(calculateLlmCost(linguisticUsage, model as ClaudeModel));
-  console.log(`[pipeline:${pipelineId}] linguistic review saved`);
-
-  console.log(`[pipeline:${pipelineId}] generating video spec...`);
-  const { data: videoSpec, usage: videoSpecUsage } =
-    await videoSpecGeneratorAgent(finalScript, model);
-  await saveVideoSpec(pipelineId, userId, videoSpec);
-  await addCost(calculateLlmCost(videoSpecUsage, model as ClaudeModel));
-
-  console.log(`[pipeline:${pipelineId}] validating video spec...`);
-  validateVideoSpec(videoSpec);
-  console.log(`[pipeline:${pipelineId}] video spec valid`);
-
-  console.log(`[pipeline:${pipelineId}] video spec saved`);
-
-  console.log(`[pipeline:${pipelineId}] generating audio...`);
-  const soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId, ttsVoice);
-  await saveAudioSpec(pipelineId, userId, soundSpec);
-  await addCost(
-    calculateTtsCost(
-      videoSpec.voiceoverText.length,
-      "gemini-3.1-flash-tts-preview",
-    ),
-  );
-  console.log(`[pipeline:${pipelineId}] audio saved`);
-
-  console.log(`[pipeline:${pipelineId}] running forced alignment...`);
-  const alignedCaptions = await forcedAlignmentAgent(
-    soundSpec.audioFilePath,
-    videoSpec.voiceoverText,
-  );
-  console.log(
-    `[pipeline:${pipelineId}] forced alignment done — ${alignedCaptions.length} caption chunks`,
-  );
-  const alignmentMinutes =
-    alignedCaptions.length > 0
-      ? alignedCaptions[alignedCaptions.length - 1]!.endSec / 60
-      : 0;
-  await addCost(calculateAlignmentCost(alignmentMinutes));
-
-  console.log(`[pipeline:${pipelineId}] generating AI video clips...`);
-  const bgVideoPath = await generateAiVideoClips(
-    videoSpec.scenes,
-    pipelineId,
-    videoModel,
-  );
-  console.log(
-    `[pipeline:${pipelineId}] AI background assembled at ${bgVideoPath}`,
-  );
-
-  console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
-  let thumbnailBuffer: Buffer | undefined;
-  let thumbnailLlmUsage: LlmUsage | undefined;
-  try {
-    const { data: buf, usage: thumbUsage } = await generateThumbnailOpenRouter(
-      videoSpec,
-      model,
-      // "black-forest-labs/flux.2-pro",
-      "google/gemini-3.1-flash-image",
-    );
-    thumbnailBuffer = buf;
-    thumbnailLlmUsage = thumbUsage;
-    // const { data: buf, usage: thumbUsage } = await generateThumbnailAgent(videoSpec, model);
-  } catch (err) {
-    console.warn(
-      `[pipeline:${pipelineId}] thumbnail generation skipped: ${err instanceof Error ? err.message : err}`,
-    );
-  }
-  if (thumbnailLlmUsage) {
-    await addCost(calculateLlmCost(thumbnailLlmUsage, model as ClaudeModel));
-  }
-  if (thumbnailBuffer) {
-    await addCost(
-      calculateImageCost(720, 1280, "black-forest-labs/flux.2-pro"),
-    );
-  }
-
-  console.log(`[pipeline:${pipelineId}] compositing video...`);
-  const rawVideoPath = await compositeVideo(
-    pipelineId,
-    alignedCaptions,
-    bgVideoPath,
-  );
-
-  let finalVideoPath = rawVideoPath;
-  if (thumbnailBuffer) {
-    console.log(`[pipeline:${pipelineId}] burning thumbnail into video...`);
-    try {
-      finalVideoPath = await burnThumbnailIntoVideo(
-        rawVideoPath,
-        thumbnailBuffer,
-        pipelineId,
-      );
-      fs.unlink(rawVideoPath, () => {});
-    } catch (err) {
-      console.warn(
-        `[pipeline:${pipelineId}] thumbnail burn skipped: ${err instanceof Error ? err.message : err}`,
-      );
-      finalVideoPath = rawVideoPath;
-    }
-  }
-
-  // console.log(`[pipeline:${pipelineId}] validating final video...`);
-  // await validateFinalVideo(finalVideoPath);
-  const videoDurationSec = await getVideoDuration(finalVideoPath);
-  console.log(`[pipeline:${pipelineId}] uploading to s3`);
-  const { key, url } = await uploadToS3(finalVideoPath, pipelineId);
-  console.log("Uploaded to S3");
-  await saveVideoOutput(pipelineId, userId, key, videoDurationSec);
-  await addCost(calculateVideoCost(videoDurationSec, videoModel));
-  console.log(
-    `[pipeline:${pipelineId}] total cost: $${runningCost.toFixed(6)}`,
-  );
-
-  const user = await getUser(userId);
-  if (user) {
-    const { subject, html } = reelReadyEmailTemplate(user.name, topic);
-    await emailQueue.add("reel-ready", { to: user.email, subject, html });
-    console.log(
-      `[pipeline:${pipelineId}] reel-ready email queued for ${user.email}`,
-    );
-  }
-
-  fs.unlink(finalVideoPath, (err) => {
-    if (err)
-      console.warn(
-        `[pipeline:${pipelineId}] failed to delete local video: ${err.message}`,
-      );
-  });
-  fs.rm(`src/video/${pipelineId}`, { recursive: true, force: true }, (err) => {
-    if (err)
-      console.warn(
-        `[pipeline:${pipelineId}] failed to delete clip dir: ${err.message}`,
-      );
-  });
-
-  let thumbnailUrl: string | undefined;
-  if (thumbnailBuffer) {
-    try {
-      const { url: tUrl } = await uploadThumbnailToS3(
-        thumbnailBuffer,
-        pipelineId,
-      );
-      thumbnailUrl = tUrl;
-      await saveThumbnailUrl(pipelineId, userId, thumbnailUrl);
-      console.log(
-        `[pipeline:${pipelineId}] thumbnail uploaded: ${thumbnailUrl}`,
-      );
-    } catch (err) {
-      console.warn(
-        `[pipeline:${pipelineId}] thumbnail S3 upload skipped: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
-
-  if (autoPublish) {
-    try {
-      console.log(`[pipeline:${pipelineId}] auto-publishing to TikTok...`);
-      const hashtags = finalScript.hashtags
-        .map((h: string) => (h.startsWith("#") ? h : `#${h}`))
-        .join(" ");
-      const title = `${finalScript.titleOptions[0]!} ${hashtags}`.trim();
-      const tiktokPublishId = await uploadToTiktokService(
-        userId,
-        pipelineId,
-        title,
-        "PUBLIC_TO_EVERYONE",
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-      );
-      console.log(
-        `[pipeline:${pipelineId}] TikTok auto-publish initiated — publishId: ${tiktokPublishId}`,
-      );
-    } catch (err: unknown) {
-      console.warn(
-        `[pipeline:${pipelineId}] TikTok auto-publish skipped: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
-
-  return await findPipelineById(pipelineId, userId);
-};
-
-export const markPipelineAsFailedService = async (
+export const resumePipelineService = async (
+  userId: string,
   pipelineId: string,
-  failureReason?: string,
-) => {
-  await markPipelineAsFailed(pipelineId, failureReason);
-};
+  _resumeFrom?: PipelineStatus,
+  executionKey = randomUUID(),
+) => dispatchPipelineService(userId, pipelineId, executionKey);
 
-const STAGE_ORDER: PipelineStatus[] = [
-  "queued",
-  "script_generated",
-  "script_finalised",
-  "linguistic_reviewed",
-  "video_spec_generated",
-  "sound_generated",
-  "video_generated",
-];
-
-function determineResumeStage(pipeline: {
-  soundSpec: any;
-  videoSpec: any;
-  finalScript: any;
-  draftScript: any;
-}): PipelineStatus {
-  if (pipeline.soundSpec) return "sound_generated";
-  if (pipeline.videoSpec) return "video_spec_generated";
-  if (pipeline.finalScript) return "script_finalised";
-  if (pipeline.draftScript) return "script_generated";
-  return "queued";
+interface RetryPipelineDependencies {
+  findPipeline: typeof findPipelineById;
+  resetPipeline: typeof resetPipelineForRetry;
 }
+
+const retryPipelineDependencies: RetryPipelineDependencies = {
+  findPipeline: findPipelineById,
+  resetPipeline: resetPipelineForRetry,
+};
 
 export const retryPipelineService = async (
   userId: string,
   pipelineId: string,
+  dependencies: RetryPipelineDependencies = retryPipelineDependencies,
 ) => {
-  const pipeline = await findPipelineById(pipelineId, userId);
+  const pipeline = await dependencies.findPipeline(pipelineId, userId);
   if (!pipeline) throw new ApiError(404, "Pipeline not found", "Not found");
   if (pipeline.pipelineStatus !== "failed") {
     throw new ApiError(400, "Pipeline is not in failed state", "Cannot retry");
   }
 
-  const resumeFrom = determineResumeStage(pipeline);
-  await resetPipelineForRetry(pipelineId, userId, resumeFrom);
-
+  const completed = inferLegacyCompletedStages(pipeline);
+  const resumeFrom: PipelineStatus = completed.includes("publish")
+    ? "publish_pending"
+    : completed.includes("upload")
+      ? "video_generated"
+      : completed.includes("audio")
+        ? "sound_generated"
+        : completed.includes("video_spec")
+          ? "video_spec_generated"
+          : completed.includes("fact_check")
+            ? "script_finalised"
+            : completed.includes("script")
+              ? "script_generated"
+              : "queued";
+  await dependencies.resetPipeline(pipelineId, userId, resumeFrom);
   return { resumeFrom, pipelineId };
-};
-
-export const resumePipelineService = async (
-  userId: string,
-  pipelineId: string,
-  resumeFrom: PipelineStatus,
-) => {
-  const pipeline = await findPipelineById(pipelineId, userId);
-  if (!pipeline) throw new ApiError(404, "Pipeline not found", "Not found");
-
-  const topic = pipeline.topic;
-  const model = pipeline.claudeModel;
-  const videoModel = pipeline.videoModel as VideoModel;
-  const ttsVoice = pipeline.ttsVoice ?? "aoede";
-  const resumeIndex = STAGE_ORDER.indexOf(resumeFrom);
-
-  console.log(
-    `[pipeline:${pipelineId}] resuming from stage: "${resumeFrom}" (index ${resumeIndex})`,
-  );
-
-  let draftScript = pipeline.draftScript as any;
-  let finalScript = pipeline.finalScript as any;
-  let videoSpec = pipeline.videoSpec as any;
-  let soundSpec = pipeline.soundSpec as any;
-
-  let runningCost = pipeline.costUsd ?? 0;
-
-  const addCost = async (amount: number) => {
-    runningCost += amount;
-    await savePipelineCost(pipelineId, userId, runningCost);
-    console.log(
-      `[pipeline:${pipelineId}] cost so far: $${runningCost.toFixed(6)}`,
-    );
-  };
-
-  if (resumeIndex < 1) {
-    console.log(`[pipeline:${pipelineId}] generating draft script...`);
-    const { data, usage } = await scriptGeneratorAgent(topic, model);
-    draftScript = data;
-    await saveDraftScript(pipelineId, userId, draftScript);
-    await addCost(calculateLlmCost(usage, model as ClaudeModel));
-    console.log(`[pipeline:${pipelineId}] draft script saved`);
-  }
-
-  if (resumeIndex < 2) {
-    console.log(`[pipeline:${pipelineId}] running fact check...`);
-    const { data: factCheck, usage } = await factCheckerAgent(
-      draftScript,
-      model,
-    );
-    if (factCheck?.verdict === "pass") {
-      finalScript = draftScript;
-    } else if (factCheck?.verdict === "revise") {
-      finalScript = factCheck.revisedScript!;
-    } else if (factCheck?.verdict === "unsafe") {
-      throw new ApiError(
-        400,
-        `Script is unsafe: ${JSON.stringify(factCheck.issues, null, 2)}`,
-        "Script is not safe.",
-      );
-    } else {
-      throw new ApiError(
-        500,
-        "Unexpected fact-check verdict",
-        "Internal error",
-      );
-    }
-    await saveFinalScript(pipelineId, userId, finalScript);
-    await addCost(calculateLlmCost(usage, model as ClaudeModel));
-    console.log(`[pipeline:${pipelineId}] final script saved`);
-  }
-
-  if (resumeIndex < 3) {
-    console.log(`[pipeline:${pipelineId}] running linguistic review...`);
-    const { data: linguisticReview, usage } = await linguisticExpertAgent(
-      finalScript,
-      model,
-    );
-    if (linguisticReview?.verdict === "revise") {
-      finalScript = linguisticReview.revisedScript!;
-    }
-    await saveLinguisticReview(pipelineId, userId, finalScript);
-    await addCost(calculateLlmCost(usage, model as ClaudeModel));
-    console.log(`[pipeline:${pipelineId}] linguistic review saved`);
-  }
-
-  if (resumeIndex < 4) {
-    console.log(`[pipeline:${pipelineId}] generating video spec...`);
-    const { data, usage } = await videoSpecGeneratorAgent(finalScript, model);
-    videoSpec = data;
-    await saveVideoSpec(pipelineId, userId, videoSpec);
-    await addCost(calculateLlmCost(usage, model as ClaudeModel));
-    console.log(`[pipeline:${pipelineId}] video spec saved`);
-  }
-
-  if (resumeIndex < 5) {
-    console.log(`[pipeline:${pipelineId}] generating audio...`);
-    soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId, ttsVoice);
-    await saveAudioSpec(pipelineId, userId, soundSpec);
-    await addCost(
-      calculateTtsCost(
-        videoSpec.voiceoverText.length,
-        "gemini-3.1-flash-tts-preview",
-      ),
-    );
-    console.log(`[pipeline:${pipelineId}] audio saved`);
-  }
-
-  if (resumeIndex < 6) {
-    if (!fs.existsSync(soundSpec.audioFilePath)) {
-      console.log(
-        `[pipeline:${pipelineId}] audio file missing, regenerating...`,
-      );
-      soundSpec = await generateTextToSpeechAgent(videoSpec, pipelineId, ttsVoice);
-      await saveAudioSpec(pipelineId, userId, soundSpec);
-      await addCost(
-        calculateTtsCost(
-          videoSpec.voiceoverText.length,
-          "gemini-3.1-flash-tts-preview",
-        ),
-      );
-    }
-
-    console.log(`[pipeline:${pipelineId}] running forced alignment...`);
-    const alignedCaptions = await forcedAlignmentAgent(
-      soundSpec.audioFilePath,
-      videoSpec.voiceoverText,
-    );
-    const alignmentMinutes =
-      alignedCaptions.length > 0
-        ? alignedCaptions[alignedCaptions.length - 1]!.endSec / 60
-        : 0;
-    await addCost(calculateAlignmentCost(alignmentMinutes));
-
-    console.log(`[pipeline:${pipelineId}] validating video spec...`);
-    validateVideoSpec(videoSpec);
-
-    console.log(`[pipeline:${pipelineId}] generating AI video clips...`);
-    const bgVideoPath = await generateAiVideoClips(
-      videoSpec.scenes,
-      pipelineId,
-      videoModel,
-    );
-
-    console.log(`[pipeline:${pipelineId}] generating thumbnail...`);
-    let thumbnailBuffer: Buffer | undefined;
-    let thumbnailLlmUsage: LlmUsage | undefined;
-    try {
-      const { data: buf, usage: thumbUsage } =
-        await generateThumbnailOpenRouter(
-          videoSpec,
-          model,
-          "black-forest-labs/flux.2-pro",
-        );
-      thumbnailBuffer = buf;
-      thumbnailLlmUsage = thumbUsage;
-    } catch (err) {
-      console.warn(
-        `[pipeline:${pipelineId}] thumbnail generation skipped: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-    if (thumbnailLlmUsage) {
-      await addCost(calculateLlmCost(thumbnailLlmUsage, model as ClaudeModel));
-    }
-    if (thumbnailBuffer) {
-      await addCost(
-        calculateImageCost(720, 1280, "black-forest-labs/flux.2-pro"),
-      );
-    }
-
-    console.log(`[pipeline:${pipelineId}] compositing video...`);
-    const rawVideoPath = await compositeVideo(
-      pipelineId,
-      alignedCaptions,
-      bgVideoPath,
-    );
-
-    let finalVideoPath = rawVideoPath;
-    if (thumbnailBuffer) {
-      console.log(`[pipeline:${pipelineId}] burning thumbnail into video...`);
-      try {
-        finalVideoPath = await burnThumbnailIntoVideo(
-          rawVideoPath,
-          thumbnailBuffer,
-          pipelineId,
-        );
-        fs.unlink(rawVideoPath, () => {});
-      } catch (err) {
-        console.warn(
-          `[pipeline:${pipelineId}] thumbnail burn skipped: ${err instanceof Error ? err.message : err}`,
-        );
-        finalVideoPath = rawVideoPath;
-      }
-    }
-
-    const videoDurationSec = await getVideoDuration(finalVideoPath);
-    console.log(`[pipeline:${pipelineId}] uploading to s3`);
-    const { key } = await uploadToS3(finalVideoPath, pipelineId);
-    await saveVideoOutput(pipelineId, userId, key, videoDurationSec);
-    await addCost(calculateVideoCost(videoDurationSec, videoModel));
-    console.log(
-      `[pipeline:${pipelineId}] total cost: $${runningCost.toFixed(6)}`,
-    );
-
-    const user = await getUser(userId);
-    if (user) {
-      const { subject, html } = reelReadyEmailTemplate(user.name, topic);
-      await emailQueue.add("reel-ready", { to: user.email, subject, html });
-    }
-
-    fs.unlink(finalVideoPath, () => {});
-    fs.rm(
-      `src/video/${pipelineId}`,
-      { recursive: true, force: true },
-      () => {},
-    );
-
-    if (thumbnailBuffer) {
-      try {
-        const { url: tUrl } = await uploadThumbnailToS3(
-          thumbnailBuffer,
-          pipelineId,
-        );
-        await saveThumbnailUrl(pipelineId, userId, tUrl);
-      } catch (err) {
-        console.warn(
-          `[pipeline:${pipelineId}] thumbnail S3 upload skipped: ${err instanceof Error ? err.message : err}`,
-        );
-      }
-    }
-  }
-
-  return await findPipelineById(pipelineId, userId);
 };

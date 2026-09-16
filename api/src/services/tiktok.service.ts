@@ -7,11 +7,23 @@ import {
   updateTiktokTokens,
 } from "../repositories/tiktok.repository";
 import {
+  beginTiktokSubmission,
+  clearTiktokSubmission,
   findPipelineById,
   publishToTiktok,
 } from "../repositories/reels.repository";
 import { ApiError } from "../utils/ApiError.util";
 import { enqueueTiktokStatusPoll } from "../queue/tiktok.queue";
+import type { WorkflowLeaseGuard } from "../types/workflow-lease.types";
+
+export class TiktokSubmissionUncertainError extends Error {
+  constructor() {
+    super(
+      "TikTok submission may have been accepted before its publish ID was persisted; automatic resubmission is blocked to prevent a duplicate post",
+    );
+    this.name = "TiktokSubmissionUncertainError";
+  }
+}
 
 export const buildAuthUrl = () => {
   const state = generateToken();
@@ -207,12 +219,15 @@ export const uploadToTiktokService = async (
   brandContentToggle: boolean,
   brandOrganicToggle: boolean,
   isAigc: boolean,
+  lease?: WorkflowLeaseGuard,
 ) => {
+  await lease?.assertOwned();
   // getValidAccessToken is called inside getCreatorInfoService; resolve token once
   // here so the publish call can reuse it without a second DB round-trip.
   const accessToken = await getValidAccessToken(userId);
 
   // Validate privacy level and duration against this creator's TikTok limits.
+  await lease?.assertOwned();
   const [creatorInfo, pipeline] = await Promise.all([
     getCreatorInfoService(userId),
     findPipelineById(pipelineId, userId),
@@ -220,6 +235,11 @@ export const uploadToTiktokService = async (
 
   if (!pipeline) {
     throw new ApiError(404, "Pipeline not found", "PIPELINE_NOT_FOUND");
+  }
+
+  if (pipeline.tiktokPublishId) {
+    await enqueueTiktokStatusPoll(pipeline.tiktokPublishId, pipelineId, userId);
+    return pipeline.tiktokPublishId;
   }
 
   if (pipeline.pipelineStatus !== "video_generated") {
@@ -272,6 +292,23 @@ export const uploadToTiktokService = async (
     is_aigc: isAigc,
   };
 
+  await lease?.assertOwned();
+  const submission = await beginTiktokSubmission(pipelineId, userId, lease);
+  if (submission.disposition === "existing") {
+    await enqueueTiktokStatusPoll(submission.publishId, pipelineId, userId);
+    return submission.publishId;
+  }
+  if (submission.disposition === "uncertain") {
+    throw new TiktokSubmissionUncertainError();
+  }
+  if (submission.disposition === "not_ready") {
+    throw new ApiError(
+      400,
+      "Pipeline video is not ready for publishing",
+      "PIPELINE_NOT_READY",
+    );
+  }
+  const submissionAttemptId = submission.submissionAttemptId;
   const res = await fetch(
     "https://open.tiktokapis.com/v2/post/publish/video/init/",
     {
@@ -291,6 +328,12 @@ export const uploadToTiktokService = async (
   );
   const data = await res.json();
   if (data.error?.code !== "ok") {
+    await clearTiktokSubmission(
+      pipelineId,
+      userId,
+      submissionAttemptId,
+      lease,
+    );
     throw new ApiError(
       400,
       `TikTok init failed: ${data.error.code} — ${data.error.message}`,
@@ -298,7 +341,17 @@ export const uploadToTiktokService = async (
     );
   }
   const publishId = data.data.publish_id;
-  await publishToTiktok(pipelineId, userId, publishId);
+  if (typeof publishId !== "string" || publishId.length === 0) {
+    throw new TiktokSubmissionUncertainError();
+  }
+  await publishToTiktok(
+    pipelineId,
+    userId,
+    publishId,
+    submissionAttemptId,
+    lease,
+  );
+  await lease?.assertOwned();
   await enqueueTiktokStatusPoll(publishId, pipelineId, userId);
   return publishId;
 };

@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import { randomUUID } from "crypto";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
@@ -10,8 +11,49 @@ import {
   AI_VIDEO_DURATION_TOLERANCE,
   type VideoModel,
 } from "../../../constants/constant";
+import { beginProviderAttempt, finishProviderAttempt } from "../../../repositories/provider-usage.repository";
+import { calculateVideoCost } from "../../../utils/cost.util";
+import type { MeteringContext } from "../llm-metering";
+import {
+  ProviderJobFailedError,
+  generateVideoScene,
+  type VideoSceneJobState,
+} from "../video-scene-generation.service";
+import {
+  getWorkflowArtifactDetails,
+  persistInlineWorkflowArtifact,
+  persistWorkflowFile,
+  restoreWorkflowFile,
+} from "../workflow-artifact.service";
+import {
+  stableFingerprint,
+  workflowArtifactKey,
+} from "../../../helpers/workflow-artifact.helper";
+import { EXPLAINER_WORKFLOW_VERSION } from "../../../helpers/workflow.helper";
 
 const execFileAsync = promisify(execFile);
+
+function temporarySiblingPath(filePath: string): string {
+  const extension = path.extname(filePath);
+  const basename = path.basename(filePath, extension);
+  return path.join(
+    path.dirname(filePath),
+    `.${basename}.${process.pid}-${randomUUID()}.tmp${extension}`,
+  );
+}
+
+async function replaceWithFfmpegOutput(
+  outputPath: string,
+  args: string[],
+): Promise<void> {
+  const temporaryPath = temporarySiblingPath(outputPath);
+  try {
+    await execFileAsync("ffmpeg", ["-nostdin", "-y", ...args, temporaryPath]);
+    await fs.promises.rename(temporaryPath, outputPath);
+  } finally {
+    await fs.promises.unlink(temporaryPath).catch(() => {});
+  }
+}
 
 function buildPrompt(bgPrompt: string): string {
   return `${bgPrompt}. Vertical 9:16 portrait composition for TikTok, 720x1280. Cinematic, coherent motion, high detail. No readable text, subtitles, captions, logos, interface elements, or watermark.`;
@@ -45,11 +87,15 @@ async function submitSceneJob(scene: Scene, model: string): Promise<string> {
   return result.id;
 }
 
-async function pollJobUntilDone(jobId: string): Promise<string> {
+async function pollJobUntilDone(
+  jobId: string,
+  assertOwned?: () => Promise<void>,
+): Promise<string> {
   const deadline = Date.now() + AI_VIDEO_POLL_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, AI_VIDEO_POLL_INTERVAL_MS));
+    await assertOwned?.();
 
     const result = await openRouterClient.videoGeneration.getGeneration({
       jobId,
@@ -68,7 +114,7 @@ async function pollJobUntilDone(jobId: string): Promise<string> {
     }
 
     if (result.status === "failed") {
-      throw new Error(
+      throw new ProviderJobFailedError(
         `[ai-video] job ${jobId} failed: ${(result as { error?: string }).error ?? "no error detail"}`,
       );
     }
@@ -84,32 +130,38 @@ async function downloadClip(jobId: string, destPath: string): Promise<void> {
     jobId,
   });
 
-  const writer = fs.createWriteStream(destPath);
+  const temporaryPath = temporarySiblingPath(destPath);
+  const writer = fs.createWriteStream(temporaryPath, { flags: "wx" });
   const reader = stream.getReader();
 
-  await new Promise<void>((resolve, reject) => {
-    writer.on("error", reject);
-    writer.on("finish", resolve);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      writer.on("error", reject);
+      writer.on("finish", resolve);
 
-    const pump = async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            writer.end();
-            break;
+      const pump = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              writer.end();
+              break;
+            }
+            if (!writer.write(value)) {
+              await new Promise((r) => writer.once("drain", r));
+            }
           }
-          if (!writer.write(value)) {
-            await new Promise((r) => writer.once("drain", r));
-          }
+        } catch (err) {
+          writer.destroy(err instanceof Error ? err : new Error(String(err)));
+          reject(err);
         }
-      } catch (err) {
-        writer.destroy(err instanceof Error ? err : new Error(String(err)));
-        reject(err);
-      }
-    };
-    pump();
-  });
+      };
+      void pump();
+    });
+    await fs.promises.rename(temporaryPath, destPath);
+  } finally {
+    await fs.promises.unlink(temporaryPath).catch(() => {});
+  }
 }
 
 async function validateClipWithFfprobe(filePath: string): Promise<void> {
@@ -131,7 +183,7 @@ async function validateClipWithFfprobe(filePath: string): Promise<void> {
   }
 }
 
-async function normalizeClip(
+export async function normalizeClip(
   inputPath: string,
   outputPath: string,
   sceneDurationSec: number,
@@ -151,7 +203,7 @@ async function normalizeClip(
   const hasAudio = audioCheck.trim().includes("audio");
 
   if (hasAudio) {
-    await execFileAsync("ffmpeg", [
+    await replaceWithFfmpegOutput(outputPath, [
       "-i",
       inputPath,
       "-t",
@@ -174,10 +226,9 @@ async function normalizeClip(
       "30",
       "-c:a",
       "aac",
-      outputPath,
     ]);
   } else {
-    await execFileAsync("ffmpeg", [
+    await replaceWithFfmpegOutput(outputPath, [
       "-i",
       inputPath,
       "-f",
@@ -204,24 +255,29 @@ async function normalizeClip(
       "30",
       "-c:a",
       "aac",
-      outputPath,
     ]);
   }
 }
 
-async function concatenateClips(
+export async function concatenateClips(
   clipPaths: string[],
   pipelineDir: string,
   expectedTotalDuration: number,
 ): Promise<string> {
-  const manifestPath = path.join(pipelineDir, "concat.txt");
+  const manifestPath = path.join(
+    pipelineDir,
+    `.concat.${process.pid}-${randomUUID()}.txt`,
+  );
   const outputPath = path.join(pipelineDir, "bg-assembled.mp4");
+  const temporaryOutputPath = temporarySiblingPath(outputPath);
 
   const manifest = clipPaths.map((p) => `file '${path.resolve(p)}'`).join("\n");
   await fs.promises.writeFile(manifestPath, manifest, "utf8");
 
   try {
     await execFileAsync("ffmpeg", [
+      "-nostdin",
+      "-y",
       "-f",
       "concat",
       "-safe",
@@ -230,37 +286,45 @@ async function concatenateClips(
       manifestPath,
       "-c",
       "copy",
-      outputPath,
+      temporaryOutputPath,
     ]);
+
+    const { stdout } = await execFileAsync("ffprobe", [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      temporaryOutputPath,
+    ]);
+    const assembledDuration = parseFloat(stdout.trim());
+    const diff = Math.abs(assembledDuration - expectedTotalDuration);
+    if (diff > AI_VIDEO_DURATION_TOLERANCE) {
+      throw new Error(
+        `[ai-video] assembled bg duration ${assembledDuration.toFixed(3)}s differs from spec ${expectedTotalDuration.toFixed(3)}s by ${diff.toFixed(3)}s (> ${AI_VIDEO_DURATION_TOLERANCE}s tolerance)`,
+      );
+    }
+
+    await fs.promises.rename(temporaryOutputPath, outputPath);
+    return outputPath;
   } finally {
-    await fs.promises.unlink(manifestPath).catch(() => {});
+    await Promise.all([
+      fs.promises.unlink(manifestPath).catch(() => {}),
+      fs.promises.unlink(temporaryOutputPath).catch(() => {}),
+    ]);
   }
-
-  const { stdout } = await execFileAsync("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    outputPath,
-  ]);
-  const assembledDuration = parseFloat(stdout.trim());
-  const diff = Math.abs(assembledDuration - expectedTotalDuration);
-  if (diff > AI_VIDEO_DURATION_TOLERANCE) {
-    throw new Error(
-      `[ai-video] assembled bg duration ${assembledDuration.toFixed(3)}s differs from spec ${expectedTotalDuration.toFixed(3)}s by ${diff.toFixed(3)}s (> ${AI_VIDEO_DURATION_TOLERANCE}s tolerance)`,
-    );
-  }
-
-  return outputPath;
 }
 
 export async function generateAiVideoClips(
   scenes: Scene[],
   pipelineId: string,
   videoModel: VideoModel,
+  context?: MeteringContext,
 ): Promise<string> {
+  if (!context?.budget) {
+    throw new Error("AI video generation requires a trusted provider budget context");
+  }
   const model = videoModel;
 
   const pipelineDir = path.join("src/video", pipelineId);
@@ -270,51 +334,177 @@ export async function generateAiVideoClips(
 
   // Submit and poll in batches of 2 — only start the next batch after the previous completes
   const BATCH_SIZE = 2;
-  const jobIds: string[] = [];
-  const videoUrls: string[] = [];
+  const normalizedPaths: string[] = [];
 
   for (let b = 0; b < scenes.length; b += BATCH_SIZE) {
     const batch = scenes.slice(b, b + BATCH_SIZE);
     console.log(
       `[ai-video:${pipelineId}] submitting batch ${Math.floor(b / BATCH_SIZE) + 1} (scenes ${b}–${b + batch.length - 1})...`,
     );
-    const batchIds = await Promise.all(
-      batch.map((scene) => submitSceneJob(scene, model)),
-    );
-    jobIds.push(...batchIds);
+    const settled = await Promise.allSettled(batch.map(async (scene, batchIndex) => {
+      const sceneIndex = b + batchIndex;
+      const requestedSeconds = Math.round(scene.endSec - scene.startSec);
+      const fingerprint = stableFingerprint({
+        scene,
+        model,
+        aspectRatio: "9:16",
+        resolution: "480p",
+        generateAudio: false,
+      });
+      const stateKey = workflowArtifactKey(
+        EXPLAINER_WORKFLOW_VERSION,
+        "video-scene-state",
+        String(sceneIndex),
+      );
+      const clipKey = workflowArtifactKey(
+        EXPLAINER_WORKFLOW_VERSION,
+        "video-scene",
+        String(sceneIndex),
+      );
+      const normPath = path.join(pipelineDir, `clip-${sceneIndex}.mp4`);
 
-    console.log(
-      `[ai-video:${pipelineId}] polling batch ${Math.floor(b / BATCH_SIZE) + 1}...`,
-    );
-    const batchUrls = await Promise.all(
-      batchIds.map((id) => pollJobUntilDone(id)),
-    );
-    videoUrls.push(...batchUrls);
-  }
-
-  const normalizedPaths: string[] = [];
-
-  for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i]!;
-    const jobId = jobIds[i]!;
-    const rawPath = path.join(pipelineDir, `clip-${i}-raw.mp4`);
-    const normPath = path.join(pipelineDir, `clip-${i}.mp4`);
-    const sceneDuration = scene.endSec - scene.startSec;
-
-    // videoUrls[i] is kept in case we need the URL for logging; download via SDK stream
-    console.log(
-      `[ai-video:${pipelineId}] downloading clip ${i} (url=${videoUrls[i]})...`,
-    );
-    await downloadClip(jobId, rawPath);
-
-    console.log(`[ai-video:${pipelineId}] validating clip ${i}...`);
-    await validateClipWithFfprobe(rawPath);
-
-    console.log(`[ai-video:${pipelineId}] normalizing clip ${i}...`);
-    await normalizeClip(rawPath, normPath, sceneDuration);
-
-    await fs.promises.unlink(rawPath).catch(() => {});
-    normalizedPaths.push(normPath);
+      return generateVideoScene({
+        scene,
+        model,
+        fingerprint,
+        budget: context.budget!,
+        ...(context.lease ? { lease: context.lease } : {}),
+        store: {
+          async load() {
+            const artifact = await getWorkflowArtifactDetails({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: stateKey,
+            });
+            return artifact?.fingerprint === fingerprint
+              ? artifact.metadata as VideoSceneJobState | null
+              : null;
+          },
+          async save(state) {
+            await persistInlineWorkflowArtifact({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: stateKey,
+              kind: "video_scene_state",
+              fingerprint,
+              metadata: state,
+              ...(context.lease ? {
+                stageAttemptId: context.lease.stageAttemptId,
+                leaseOwner: context.lease.leaseOwner,
+              } : {}),
+            });
+          },
+          async restoreCompleted() {
+            return await restoreWorkflowFile({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: clipKey,
+              destination: normPath,
+              fingerprint,
+            }) ? normPath : null;
+          },
+          async persistCompleted(localPath, state) {
+            await persistWorkflowFile({
+              pipelineId,
+              userId: context.userId,
+              artifactKey: clipKey,
+              kind: "video_scene",
+              filePath: localPath,
+              extension: "mp4",
+              contentType: "video/mp4",
+              fingerprint,
+              metadata: {
+                providerJobId: state.providerJobId,
+                providerAttemptId: state.providerAttemptId,
+                attemptNumber: state.attemptNumber,
+              },
+              ...(context.lease ? {
+                stageAttemptId: context.lease.stageAttemptId,
+                leaseOwner: context.lease.leaseOwner,
+              } : {}),
+            });
+            return clipKey;
+          },
+        },
+        provider: {
+          submit: submitSceneJob,
+          async waitForCompletion(jobId) {
+            await pollJobUntilDone(
+              jobId,
+              context.lease ? () => context.lease!.assertOwned() : undefined,
+            );
+          },
+          async materialize(jobId) {
+            const rawPath = path.join(pipelineDir, `clip-${sceneIndex}-raw.mp4`);
+            try {
+              await downloadClip(jobId, rawPath);
+              await validateClipWithFfprobe(rawPath);
+              await normalizeClip(rawPath, normPath, scene.endSec - scene.startSec);
+              return normPath;
+            } finally {
+              await fs.promises.unlink(rawPath).catch(() => {});
+            }
+          },
+        },
+        usage: {
+          async begin({ attemptId, attemptNumber }) {
+            await beginProviderAttempt({
+              attemptId,
+              userId: context.userId,
+              pipelineId: context.pipelineId,
+              operation: "video_generation",
+              stage: context.stage,
+              provider: "openrouter",
+              model,
+              configuration: {
+                duration: requestedSeconds,
+                aspectRatio: "9:16",
+                resolution: "480p",
+                generateAudio: false,
+                sceneIndex,
+                attempt: attemptNumber,
+              },
+            });
+          },
+          async cancelBeforeStart({ attemptId, error }) {
+            await finishProviderAttempt({
+              attemptId,
+              status: "failed",
+              usage: { generatedVideoSeconds: 0 },
+              costUsd: 0,
+              costProvenance: "actual",
+              error,
+            });
+          },
+          async succeed({ attemptId, generatedSeconds }) {
+            await finishProviderAttempt({
+              attemptId,
+              status: "succeeded",
+              usage: { generatedVideoSeconds: generatedSeconds },
+              costUsd: calculateVideoCost(generatedSeconds, videoModel).toString(),
+              costProvenance: "estimated",
+              rateVersion: "planning-2026-09-14",
+            });
+          },
+          async fail({ attemptId, error }) {
+            await finishProviderAttempt({
+              attemptId,
+              status: "failed",
+              costUsd: null,
+              costProvenance: "unknown",
+              error,
+            });
+          },
+        },
+      });
+    }));
+    const failed = settled.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
+    const batchResults = settled.map((result) => {
+      if (result.status !== "fulfilled") throw result.reason;
+      return result.value;
+    });
+    normalizedPaths.push(...batchResults);
   }
 
   console.log(

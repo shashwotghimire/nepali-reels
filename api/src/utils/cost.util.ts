@@ -32,10 +32,16 @@ export const calculateLlmCost = (usage: LlmUsage, model: ClaudeModel): number =>
   );
 };
 
-export const calculateTtsCost = (chars: number, model: string): number => {
+// Gemini audio output is billed separately from text input. Character count is
+// not a substitute for either token count; an absent usage field stays unknown.
+export const estimateTtsTokenCost = (
+  inputTokens: number | null,
+  outputAudioTokens: number | null,
+  model: string,
+): number | null => {
   const pricing = TTS_PRICING[model as keyof typeof TTS_PRICING];
-  if (!pricing) return 0;
-  return (chars / 1_000_000) * pricing.input;
+  if (!pricing || inputTokens === null || outputAudioTokens === null) return null;
+  return (inputTokens * pricing.input + outputAudioTokens * pricing.output) / 1_000_000;
 };
 
 export const calculateAlignmentCost = (audioMinutes: number): number =>
@@ -53,6 +59,15 @@ export const calculateImageCost = (widthPx: number, heightPx: number, model: str
   const megapixels = (widthPx * heightPx) / 1_000_000;
   return megapixels * pricing.perMegapixel;
 };
+
+export const estimateImageCost = (widthPx: number, heightPx: number, model: string): number | null => {
+  if (!(model in IMAGE_PRICING)) return null;
+  return calculateImageCost(widthPx, heightPx, model);
+};
+
+// Provider submissions use rounded clip seconds; final composition may trim them.
+export const generatedClipSeconds = (scenes: ReadonlyArray<{ startSec: number; endSec: number }>): number =>
+  scenes.reduce((total, scene) => total + Math.round(scene.endSec - scene.startSec), 0);
 
 export const sumCosts = (...amounts: number[]): number =>
   amounts.reduce((acc, v) => acc + v, 0);

@@ -7,10 +7,14 @@ import type { AnalyticsReport } from "../../../schema/analytics.schema";
 import { tavliySearchTool } from "../../../tools/tavily-search.tool";
 import { runTavilySearch } from "../../../configs/tavily.config";
 import { FACT_CHECK_RUNS } from "../../../constants/constant";
+import { meteredAnthropicCall, meteredTavilySearch, type MeteringContext } from "../llm-metering";
+import { estimateInputTokenReservation } from "../../../helpers/phase2-budget.helper";
+import { providerCallBudget } from "../budget-policy.service";
 
 export const improverAgent = async (
   report: AnalyticsReport,
   model: string,
+  context?: MeteringContext,
 ): Promise<ImproverOutput> => {
   const messages: MessageParam[] = [
     { role: "user", content: JSON.stringify(report) },
@@ -18,7 +22,7 @@ export const improverAgent = async (
 
   try {
     for (let i = 0; i < FACT_CHECK_RUNS; i++) {
-      const response = await client.messages.parse({
+      const response = await meteredAnthropicCall(context, "improver", model, () => client.messages.parse({
         model,
         max_tokens: 8192,
         system: improverPrompt,
@@ -27,7 +31,10 @@ export const improverAgent = async (
           format: zodOutputFormat(ImproverOutputSchema),
         },
         messages,
-      });
+      }, { maxRetries: 0 }), providerCallBudget({
+        inputTokens: estimateInputTokenReservation(improverPrompt, messages, tavliySearchTool),
+        outputTokens: 8_192,
+      }));
 
       messages.push({ role: "assistant", content: response.content });
 
@@ -44,9 +51,8 @@ export const improverAgent = async (
           if (tool.name !== "tavily_search") {
             throw new Error(`Unexpected tool call: ${tool.name}`);
           }
-          const results = await runTavilySearch(
-            (tool.input as { query: string }).query,
-          );
+          const query = (tool.input as { query: string }).query;
+          const results = await meteredTavilySearch(context, query, () => runTavilySearch(query));
           return {
             type: "tool_result" as const,
             tool_use_id: tool.id,

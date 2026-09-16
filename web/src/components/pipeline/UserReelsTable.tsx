@@ -87,7 +87,7 @@ export default function UserReelsTable() {
                 {reel.videoModel.split("/")[1] ?? reel.videoModel}
               </TableCell>
               <TableCell className="hidden sm:table-cell text-muted-foreground text-xs tabular-nums">
-                {reel.costUsd != null ? `$${reel.costUsd.toFixed(4)}` : "—"}
+                {reel.costUsd != null ? `~$${reel.costUsd.toFixed(4)}${reel.costEstimateIncomplete !== false ? " (partial)" : ""}` : "—"}
               </TableCell>
               <TableCell className="hidden sm:table-cell text-muted-foreground text-xs tabular-nums">
                 {new Date(reel.createdAt).toLocaleDateString()}
