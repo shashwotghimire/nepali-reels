@@ -1,7 +1,7 @@
 # SaaS phase checklist
 
 - [x] Phase 1: plan, entitlements, usage ledger, cost estimates, budget policy, mocked tests and builds (approved in code review)
-- [ ] Phase 2: shared Explainer workflow, durable checkpoints and enforceable resource budgets (corrections complete; re-review pending)
+- [x] Phase 2: shared Explainer workflow, durable checkpoints and enforceable resource budgets (approved in independent code review)
 - [ ] Phase 3: Story and List workflows
 - [ ] Phase 4: paid creation features
 - [ ] Phase 5: subscriptions and allowances
