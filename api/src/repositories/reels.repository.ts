@@ -1,4 +1,5 @@
 import { Op, type Transaction } from "sequelize";
+import { randomUUID } from "node:crypto";
 import sequelize from "../configs/db.config";
 import Reels from "../models/reels.model";
 import WorkflowStageAttempt from "../models/workflow-stage-attempt.model";
@@ -42,24 +43,31 @@ async function mutatePipelineWithLease(
     // Match claim/takeover lock ordering: the stable reel row is always locked
     // before its stage attempt. This keeps validation and mutation atomic.
     const pipeline = await findOwnedPipelineForUpdate(pipelineId, userId, transaction);
-    const attempt = await WorkflowStageAttempt.findByPk(lease.stageAttemptId, {
-      transaction,
-      lock: transaction.LOCK.UPDATE,
-    });
-    const now = Date.now();
-    if (
-      !attempt
-      || attempt.pipelineId !== pipelineId
-      || attempt.status !== "running"
-      || attempt.leaseOwner !== lease.leaseOwner
-      || !attempt.leaseExpiresAt
-      || attempt.leaseExpiresAt.getTime() <= now
-    ) {
-      throw new WorkflowLeaseLostError();
-    }
+    await assertPipelineLease(pipelineId, lease, transaction);
     await mutate(pipeline, transaction);
     await pipeline.save({ transaction });
   });
+}
+
+async function assertPipelineLease(
+  pipelineId: string,
+  lease: WorkflowLeaseWriteFence | undefined,
+  transaction: Transaction,
+) {
+  if (!lease) return;
+  const attempt = await WorkflowStageAttempt.findByPk(lease.stageAttemptId, {
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  const now = Date.now();
+  if (
+    !attempt
+    || attempt.pipelineId !== pipelineId
+    || attempt.status !== "running"
+    || attempt.leaseOwner !== lease.leaseOwner
+    || !attempt.leaseExpiresAt
+    || attempt.leaseExpiresAt.getTime() <= now
+  ) throw new WorkflowLeaseLostError();
 }
 
 export const createPipeline = (
@@ -168,13 +176,71 @@ export const publishToTiktok = async (
   pipelineId: string,
   userId: string,
   tiktokPublishId: string,
+  submissionAttemptId: string,
   lease?: WorkflowLeaseWriteFence,
 ) => {
-  await mutatePipelineWithLease(pipelineId, userId, lease, (pipeline) => {
+  await sequelize.transaction(async (transaction) => {
+    const pipeline = await findOwnedPipelineForUpdate(pipelineId, userId, transaction);
+    await assertPipelineLease(pipelineId, lease, transaction);
+    if (
+      pipeline.tiktokSubmissionState !== "submitting"
+      || pipeline.tiktokSubmissionAttemptId !== submissionAttemptId
+    ) throw new Error("TikTok submission attempt is no longer active");
     pipeline.tiktokPublishId = tiktokPublishId;
+    pipeline.tiktokSubmissionState = "submitted";
     pipeline.pipelineStatus = "publish_pending";
+    await pipeline.save({ transaction });
   });
 };
+
+export type BeginTiktokSubmissionResult =
+  | { disposition: "started"; submissionAttemptId: string }
+  | { disposition: "existing"; publishId: string }
+  | { disposition: "uncertain" }
+  | { disposition: "not_ready" };
+
+/** Atomically guards both workflow and manual TikTok submissions. */
+export async function beginTiktokSubmission(
+  pipelineId: string,
+  userId: string,
+  lease?: WorkflowLeaseWriteFence,
+): Promise<BeginTiktokSubmissionResult> {
+  return sequelize.transaction(async (transaction) => {
+    const pipeline = await findOwnedPipelineForUpdate(pipelineId, userId, transaction);
+    await assertPipelineLease(pipelineId, lease, transaction);
+    if (pipeline.tiktokPublishId) {
+      return { disposition: "existing", publishId: pipeline.tiktokPublishId };
+    }
+    if (pipeline.tiktokSubmissionState) return { disposition: "uncertain" };
+    if (pipeline.pipelineStatus !== "video_generated") return { disposition: "not_ready" };
+
+    const submissionAttemptId = randomUUID();
+    pipeline.tiktokSubmissionState = "submitting";
+    pipeline.tiktokSubmissionAttemptId = submissionAttemptId;
+    await pipeline.save({ transaction });
+    return { disposition: "started", submissionAttemptId };
+  });
+}
+
+/** Clear only when TikTok explicitly rejected the matching request. */
+export async function clearTiktokSubmission(
+  pipelineId: string,
+  userId: string,
+  submissionAttemptId: string,
+  lease?: WorkflowLeaseWriteFence,
+): Promise<void> {
+  await sequelize.transaction(async (transaction) => {
+    const pipeline = await findOwnedPipelineForUpdate(pipelineId, userId, transaction);
+    await assertPipelineLease(pipelineId, lease, transaction);
+    if (
+      pipeline.tiktokSubmissionState !== "submitting"
+      || pipeline.tiktokSubmissionAttemptId !== submissionAttemptId
+    ) throw new Error("TikTok submission attempt is no longer active");
+    pipeline.tiktokSubmissionState = null;
+    pipeline.tiktokSubmissionAttemptId = null;
+    await pipeline.save({ transaction });
+  });
+}
 
 export const savePipelineCost = async (
   pipelineId: string,

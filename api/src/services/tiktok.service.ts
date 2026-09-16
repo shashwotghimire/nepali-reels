@@ -7,16 +7,14 @@ import {
   updateTiktokTokens,
 } from "../repositories/tiktok.repository";
 import {
+  beginTiktokSubmission,
+  clearTiktokSubmission,
   findPipelineById,
   publishToTiktok,
 } from "../repositories/reels.repository";
 import { ApiError } from "../utils/ApiError.util";
 import { enqueueTiktokStatusPoll } from "../queue/tiktok.queue";
 import type { WorkflowLeaseGuard } from "../types/workflow-lease.types";
-import {
-  beginStageProviderSubmission,
-  clearStageProviderSubmission,
-} from "../repositories/workflow-execution.repository";
 
 export class TiktokSubmissionUncertainError extends Error {
   constructor() {
@@ -295,20 +293,22 @@ export const uploadToTiktokService = async (
   };
 
   await lease?.assertOwned();
-  let providerAttemptId: string | undefined;
-  if (lease) {
-    const submission = await beginStageProviderSubmission({
-      pipelineId,
-      userId,
-      stageAttemptId: lease.stageAttemptId,
-      leaseOwner: lease.leaseOwner,
-      stage: "publish",
-    });
-    if (submission.disposition === "uncertain") {
-      throw new TiktokSubmissionUncertainError();
-    }
-    providerAttemptId = submission.providerAttemptId;
+  const submission = await beginTiktokSubmission(pipelineId, userId, lease);
+  if (submission.disposition === "existing") {
+    await enqueueTiktokStatusPoll(submission.publishId, pipelineId, userId);
+    return submission.publishId;
   }
+  if (submission.disposition === "uncertain") {
+    throw new TiktokSubmissionUncertainError();
+  }
+  if (submission.disposition === "not_ready") {
+    throw new ApiError(
+      400,
+      "Pipeline video is not ready for publishing",
+      "PIPELINE_NOT_READY",
+    );
+  }
+  const submissionAttemptId = submission.submissionAttemptId;
   const res = await fetch(
     "https://open.tiktokapis.com/v2/post/publish/video/init/",
     {
@@ -328,13 +328,12 @@ export const uploadToTiktokService = async (
   );
   const data = await res.json();
   if (data.error?.code !== "ok") {
-    if (lease && providerAttemptId) {
-      await clearStageProviderSubmission({
-        stageAttemptId: lease.stageAttemptId,
-        leaseOwner: lease.leaseOwner,
-        providerAttemptId,
-      });
-    }
+    await clearTiktokSubmission(
+      pipelineId,
+      userId,
+      submissionAttemptId,
+      lease,
+    );
     throw new ApiError(
       400,
       `TikTok init failed: ${data.error.code} — ${data.error.message}`,
@@ -342,7 +341,16 @@ export const uploadToTiktokService = async (
     );
   }
   const publishId = data.data.publish_id;
-  await publishToTiktok(pipelineId, userId, publishId, lease);
+  if (typeof publishId !== "string" || publishId.length === 0) {
+    throw new TiktokSubmissionUncertainError();
+  }
+  await publishToTiktok(
+    pipelineId,
+    userId,
+    publishId,
+    submissionAttemptId,
+    lease,
+  );
   await lease?.assertOwned();
   await enqueueTiktokStatusPoll(publishId, pipelineId, userId);
   return publishId;

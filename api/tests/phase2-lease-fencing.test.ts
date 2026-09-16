@@ -6,7 +6,6 @@ import Reels from "../src/models/reels.model";
 import WorkflowArtifact from "../src/models/workflow-artifact.model";
 import WorkflowStageAttempt from "../src/models/workflow-stage-attempt.model";
 import {
-  beginStageProviderSubmission,
   claimWorkflowStageAttempt,
   completeWorkflowStageAttempt,
   ensureStageProviderAttemptId,
@@ -186,58 +185,6 @@ test("expired workers cannot allocate provider identities or replace stage artif
     Object.assign(Reels, { findOne: originals.reelFindOne });
     Object.assign(WorkflowStageAttempt, { findByPk: originals.attemptFindByPk });
     Object.assign(WorkflowArtifact, { findOne: originals.artifactFindOne });
-  }
-});
-
-test("a successor cannot repeat an unresolved provider submission", async () => {
-  const originals = {
-    transaction: sequelize.transaction,
-    reelFindOne: Reels.findOne,
-    attemptFindByPk: WorkflowStageAttempt.findByPk,
-    attemptFindOne: WorkflowStageAttempt.findOne,
-  };
-  const current = {
-    id: "attempt-new",
-    pipelineId,
-    workflowVersion: 1,
-    stage: "publish",
-    status: "running",
-    leaseOwner: "new-worker",
-    leaseExpiresAt: new Date(Date.now() + 60_000),
-    providerAttemptId: null as string | null,
-    save: async () => {},
-  };
-  const unresolved = {
-    id: "attempt-old",
-    pipelineId,
-    workflowVersion: 1,
-    stage: "publish",
-    status: "failed",
-    providerAttemptId: "provider-attempt-old",
-  };
-  Object.assign(sequelize, { transaction: async (callback: (tx: unknown) => unknown) => callback(transaction) });
-  Object.assign(Reels, { findOne: async () => ({ id: pipelineId, userId }) });
-  Object.assign(WorkflowStageAttempt, {
-    findByPk: async () => current,
-    findOne: async () => unresolved,
-  });
-  try {
-    const result = await beginStageProviderSubmission({
-      pipelineId,
-      userId,
-      stageAttemptId: current.id,
-      leaseOwner: current.leaseOwner,
-      stage: "publish",
-    });
-    assert.equal(result.disposition, "uncertain");
-    assert.equal(current.providerAttemptId, null);
-  } finally {
-    Object.assign(sequelize, { transaction: originals.transaction });
-    Object.assign(Reels, { findOne: originals.reelFindOne });
-    Object.assign(WorkflowStageAttempt, {
-      findByPk: originals.attemptFindByPk,
-      findOne: originals.attemptFindOne,
-    });
   }
 });
 
