@@ -3,7 +3,7 @@
 - [x] Phase 1: plan, entitlements, usage ledger, cost estimates, budget policy, mocked tests and builds (approved in code review)
 - [x] Phase 2: shared Explainer workflow, durable checkpoints and enforceable resource budgets (approved in independent code review)
 - [x] Phase 3: Story and List workflows (implemented; awaiting user review)
-- [ ] Phase 4: paid creation features
+- [x] Phase 4: paid creation features (implemented; awaiting user review)
 - [ ] Phase 5: subscriptions and allowances
 - [ ] Phase 6: launch validation
 
@@ -40,3 +40,11 @@ Phase 3 review corrections:
 - Scene `onScreenText` is now a real timed composition input. List validation requires each item overlay to include its number, the shared renderer draws those number/label overlays separately from bottom narration captions, and an FFmpeg regression test verifies visible overlay pixels in the delivered frame.
 - Timed scene overlays stay anchored to the assembled generated-video timeline. They are not rescaled when narration duration differs from planned scene duration; the FFmpeg regression covers a 0.6-second visual timeline with 0.9-second narration and checks both the intended visible window and the later absent window.
 - Fictional Story narration must contain its approved `disclosureNp` verbatim. Video-spec validation cross-checks that same approved disclosure against the TTS `voiceoverText`, so a fictional disclosure cannot remain only in metadata.
+
+Phase 4 adds a durable approval pause to Explainer, Story and List before video-spec/media work. Manual edits and AI revisions use optimistic script versions; AI revision requests reserve their entitlement atomically and use an idempotency key so concurrent/replayed requests cannot consume two revisions. Superseding a script clears approval and downstream checkpoints/artifacts, while completed reels are immutable. Fictional Story disclosure and List structure validations are re-run after every edit/revision.
+
+Creation access is resolved server-side. `PHASE4_TEST_ENTITLEMENTS` is an explicit non-production-only user-to-plan injection boundary until Phase 5 billing exists; production and unlisted users retain the documented `legacy_compatibility` path and are not assigned a trial or paid plan. Trial gets the default voice/caption and no thumbnail, Creator gets the approved voice/caption/overlay/style and single-thumbnail features, and Plus gets three saved styles plus two metered thumbnail regenerations with selectable versions.
+
+Saved style limits are enforced while holding authoritative user ownership, logo uploads are stored in S3, and a style snapshot is persisted on the reel. Caption presets and channel name/logo overlays are rasterized and passed into FFmpeg composition, rather than being UI-only metadata. Thumbnail generations use versioned S3 keys and durable selection metadata.
+
+Phase 4 verification uses mocked/no-provider tests and local Skia/FFmpeg fixtures only. No live provider generation, database migration, publication, deployment, or billing work was performed. Apply all September migrations in timestamp order, ending with `20260916000002-phase4-creation-features.js`, to a disposable/staging database before deployment. The shared database described in the handoff remains untouched.

@@ -5,6 +5,8 @@ import type {
   GetReelsParams,
   GetReelsResponse,
   Reel,
+  GenerationEntitlements,
+  ChannelStyle,
 } from "@/types/api/pipeline-api.types";
 
 export const getReelsService = async (params?: GetReelsParams) => {
@@ -50,3 +52,35 @@ export const retryPipelineService = async (id: string) => {
   ).data;
   return res.data;
 };
+
+export const getEntitlementsService = async () => {
+  const res = (await axiosInstance.get<{ data: GenerationEntitlements }>("/api/pipeline/entitlements")).data;
+  return res.data;
+};
+
+export const editScriptService = async (id: string, expectedVersion: number, script: object) => {
+  const res = (await axiosInstance.patch<{ data: Reel }>(`/api/pipeline/${id}/script`, { expectedVersion, script })).data;
+  return res.data;
+};
+
+export const reviseScriptService = async (id: string, expectedVersion: number, instruction: string) => {
+  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/script/revise`, { expectedVersion, instruction }, { headers: { "Idempotency-Key": crypto.randomUUID() } })).data;
+  return res.data;
+};
+
+export const approveScriptService = async (id: string, expectedVersion: number) => {
+  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/script/approve`, { expectedVersion })).data;
+  return res.data;
+};
+
+export const regenerateThumbnailService = async (id: string) => {
+  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/thumbnails/regenerate`, undefined, { headers: { "Idempotency-Key": crypto.randomUUID() } })).data;
+  return res.data;
+};
+export const selectThumbnailService = async (id: string, version: number) => {
+  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/thumbnails/${version}/select`)).data;
+  return res.data;
+};
+export const getChannelStylesService = async () => ((await axiosInstance.get<{ data: ChannelStyle[] }>("/api/pipeline/styles")).data.data);
+export const createChannelStyleService = async (form: FormData) => ((await axiosInstance.post<{ data: ChannelStyle }>("/api/pipeline/styles", form)).data.data);
+export const deleteChannelStyleService = async (id: string) => { await axiosInstance.delete(`/api/pipeline/styles/${id}`); };

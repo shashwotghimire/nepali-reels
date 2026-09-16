@@ -48,8 +48,9 @@ export const getS3PresignedUrl = async (key: string, expiresIn = 3600) => {
 export const uploadThumbnailToS3 = async (
   imageBuffer: Buffer,
   pipelineId: string,
+  version = 1,
 ) => {
-  const fileKey = `thumbnails/${pipelineId}.jpg`;
+  const fileKey = `thumbnails/${pipelineId}/v${version}.jpg`;
   await s3.send(
     new PutObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET!,
@@ -62,6 +63,13 @@ export const uploadThumbnailToS3 = async (
     key: fileKey,
     url: `https://${process.env.AWS_CLOUDFRONT_DOMAIN}/thumbnails/${pipelineId}.jpg`,
   };
+};
+
+export const uploadChannelLogoToS3 = async (imageBuffer: Buffer, userId: string, styleId: string, contentType: string) => {
+  const extension = contentType === "image/png" ? "png" : "jpg";
+  const key = `channel-styles/${userId}/${styleId}.${extension}`;
+  await s3.send(new PutObjectCommand({ Bucket: process.env.AWS_S3_BUCKET!, Key: key, Body: imageBuffer, ContentType: contentType }));
+  return { key, url: `https://${process.env.AWS_CLOUDFRONT_DOMAIN}/${key}` };
 };
 
 export const deleteFromS3 = async (key: string) => {

@@ -5,6 +5,15 @@ import {
   getPipelineByIdService,
   deletePipelineService,
   retryPipelineService,
+  approveScriptService,
+  editScriptService,
+  getEntitlementsService,
+  reviseScriptService,
+  regenerateThumbnailService,
+  selectThumbnailService,
+  createChannelStyleService,
+  deleteChannelStyleService,
+  getChannelStylesService,
 } from "@/services/pipeline.service";
 import type {
   GenerateScriptRequest,
@@ -18,7 +27,7 @@ export const useGetReelsOfUser = (params?: GetReelsParams) =>
     placeholderData: (prev) => prev,
   });
 
-const TERMINAL_STATUSES = ["video_generated", "published", "failed"];
+const TERMINAL_STATUSES = ["video_generated", "published", "failed", "awaiting_script_approval"];
 
 export const useGetPipelineById = (id: string) =>
   useQuery({
@@ -42,6 +51,30 @@ export const useDeletePipeline = () => {
     },
   });
 };
+
+export const useGenerationEntitlements = () => useQuery({
+  queryKey: ["pipeline", "entitlements"], queryFn: getEntitlementsService,
+});
+
+function useScriptMutation<T>(id: string, mutationFn: (input: T) => Promise<unknown>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pipeline", id] }),
+  });
+}
+
+export const useEditScript = (id: string) => useScriptMutation(id, (input: { expectedVersion: number; script: object }) =>
+  editScriptService(id, input.expectedVersion, input.script));
+export const useReviseScript = (id: string) => useScriptMutation(id, (input: { expectedVersion: number; instruction: string }) =>
+  reviseScriptService(id, input.expectedVersion, input.instruction));
+export const useApproveScript = (id: string) => useScriptMutation(id, (expectedVersion: number) =>
+  approveScriptService(id, expectedVersion));
+export const useRegenerateThumbnail = (id: string) => useScriptMutation(id, () => regenerateThumbnailService(id));
+export const useSelectThumbnail = (id: string) => useScriptMutation(id, (version: number) => selectThumbnailService(id, version));
+export const useChannelStyles = () => useQuery({ queryKey: ["pipeline", "styles"], queryFn: getChannelStylesService });
+export const useCreateChannelStyle = () => { const qc = useQueryClient(); return useMutation({ mutationFn: createChannelStyleService, onSuccess: () => qc.invalidateQueries({ queryKey: ["pipeline", "styles"] }) }); };
+export const useDeleteChannelStyle = () => { const qc = useQueryClient(); return useMutation({ mutationFn: deleteChannelStyleService, onSuccess: () => qc.invalidateQueries({ queryKey: ["pipeline", "styles"] }) }); };
 
 export const useGenerateScript = () => {
   const queryClient = useQueryClient();

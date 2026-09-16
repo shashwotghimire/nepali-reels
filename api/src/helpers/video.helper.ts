@@ -4,7 +4,7 @@ import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import type { Caption } from "../types/subtitle.types";
-import { renderCaptionFrames, renderOverlayFrames, cleanupCaptionFrames } from "./subtitle-renderer";
+import { renderBrandFrame, renderCaptionFrames, renderOverlayFrames, cleanupCaptionFrames } from "./subtitle-renderer";
 import {
   AI_VIDEO_MAX_TOTAL_DURATION,
   VIDEO_W,
@@ -213,6 +213,7 @@ export async function compositeVideo(
   captions: Caption[],
   videoInputPath: string,
   timedOverlays: Caption[] = [],
+  options: { captionPreset?: "default" | "bold" | "minimal"; channelStyle?: { channelName: string; logoUrl: string | null } | null } = {},
 ): Promise<string> {
   const audioInput = `src/audio/${pipelineId}.wav`;
   const output = `src/video/${pipelineId}-output.mp4`;
@@ -226,12 +227,13 @@ export async function compositeVideo(
 
   const scaled = scaleCaptions(captions, duration);
   await fs.promises.mkdir(temporaryFrameDir, { recursive: true });
-  const captionFrames = await renderCaptionFrames(scaled, temporaryFrameDir);
+  const captionFrames = await renderCaptionFrames(scaled, temporaryFrameDir, options.captionPreset);
   // Scene overlays are keyed to the assembled background timeline. Narration
   // duration can differ, but rescaling only the overlays would move a label
   // onto a different generated scene.
   const overlayFrames = await renderOverlayFrames(timedOverlays, temporaryFrameDir);
-  const frames = [...captionFrames, ...overlayFrames];
+  const brandFrame = options.channelStyle ? await renderBrandFrame(options.channelStyle, temporaryFrameDir, duration) : null;
+  const frames = [...captionFrames, ...overlayFrames, ...(brandFrame ? [brandFrame] : [])];
 
   // [0:v] scale+pad → [base]; then chain overlays: [base][2:v]overlay→[v1], [v1][3:v]overlay→[v2], ...
   // Input indices: 0=video, 1=audio, 2..N=caption PNGs

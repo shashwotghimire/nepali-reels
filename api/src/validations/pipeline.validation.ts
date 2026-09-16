@@ -29,6 +29,8 @@ const commonGenerationFields = {
   videoModel: z.enum(videoModelValues).default(VIDEO_MODELS["Seedance 1.5 Pro"]),
   ttsVoice: z.enum(TTS_VOICES).default("aoede"),
   autoPublish: z.boolean().default(false),
+  captionPreset: z.enum(["default", "bold", "minimal"]).default("default"),
+  styleId: z.string().uuid().optional(),
 };
 
 export const generateScriptBodySchema = z.union([
@@ -49,3 +51,18 @@ export const generateScriptBodySchema = z.union([
 ]);
 
 export const generateScriptSchema = z.object({ body: generateScriptBodySchema });
+
+export const editScriptSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+  body: z.object({ expectedVersion: z.number().int().positive(), script: z.record(z.string(), z.unknown()) }).strict(),
+});
+
+export const reviseScriptSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+  body: z.object({ expectedVersion: z.number().int().positive(), instruction: z.string().trim().min(3).max(1000) }).strict(),
+});
+
+export const approveScriptSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+  body: z.object({ expectedVersion: z.number().int().positive() }).strict(),
+});

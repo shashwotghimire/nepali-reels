@@ -67,6 +67,8 @@ Implementation status: completed in code on 2026-09-16 and awaiting user review.
 
 ## Phase 4 — Paid creation features
 
+Implementation status: completed in code on 2026-09-16 and awaiting user review. No live migration, provider spend, deployment, or publication was performed.
+
 - Script approval pause, editing and bounded AI revisions; resume from approved version.
 - Supported voices, caption presets, channel overlays and saved styles (1/3).
 - Thumbnails disabled for trial, one per paid video, Plus two regenerations with selectable versions.

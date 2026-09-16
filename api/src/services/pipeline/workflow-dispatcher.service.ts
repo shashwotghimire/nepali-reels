@@ -63,6 +63,13 @@ export class WorkflowAlreadyRunningError extends Error {
   }
 }
 
+export class WorkflowAwaitingApprovalError extends Error {
+  constructor() {
+    super("Workflow is waiting for script approval");
+    this.name = "WorkflowAwaitingApprovalError";
+  }
+}
+
 export function isWorkflowContentionError(error: unknown): boolean {
   return error instanceof WorkflowAlreadyRunningError
     || (error instanceof Error && error.name === "WorkflowAlreadyRunningError");
@@ -74,7 +81,8 @@ export function isWorkflowLeaseLostError(error: unknown): boolean {
 }
 
 export function shouldMarkPipelineFailed(error: unknown): boolean {
-  return !isWorkflowContentionError(error) && !isWorkflowLeaseLostError(error);
+  return !isWorkflowContentionError(error) && !isWorkflowLeaseLostError(error)
+    && !(error instanceof WorkflowAwaitingApprovalError || (error instanceof Error && error.name === "WorkflowAwaitingApprovalError"));
 }
 
 /** Single create/resume path. Checkpoints decide which work is reused. */

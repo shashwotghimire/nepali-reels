@@ -1,7 +1,7 @@
 import multer from "multer";
 import path from "path";
 
-const allowedExtensions = new Set([".srt", ".wav", ".mp4"]);
+const allowedExtensions = new Set([".srt", ".wav", ".mp4", ".jpg", ".jpeg", ".png"]);
 
 const storage = multer.memoryStorage();
 

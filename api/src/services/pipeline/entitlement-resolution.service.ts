@@ -29,14 +29,22 @@ export interface ResolvedGenerationEntitlement {
   accessId: string;
   accessKind: TrustedGenerationAccess["kind"] | "legacy_compatibility";
   userId: string;
-  entitlement: Pick<
-    PlanEntitlement,
-    "id" | "maxOutputDurationSeconds" | "aiRevisionsPerVideo" | "thumbnailsPerVideo"
+  entitlement: Pick<PlanEntitlement,
+    "id" | "maxOutputDurationSeconds" | "aiRevisionsPerVideo" | "thumbnailsPerVideo" |
+    "thumbnailRegenerationsPerVideo" | "styleSlots" | "videoTypes" | "manualScriptEditing" |
+    "allSupportedVoices" | "captionPresets" | "channelOverlay"
   > | {
     id: "legacy_standard";
     maxOutputDurationSeconds: 75;
     aiRevisionsPerVideo: 0;
     thumbnailsPerVideo: 1;
+    thumbnailRegenerationsPerVideo: 0;
+    styleSlots: 0;
+    videoTypes: readonly ["explainer", "story", "list"];
+    manualScriptEditing: true;
+    allSupportedVoices: true;
+    captionPresets: false;
+    channelOverlay: false;
   };
 }
 
@@ -56,8 +64,44 @@ export function resolveLegacyCompatibilityAccess(
       maxOutputDurationSeconds: 75,
       aiRevisionsPerVideo: 0,
       thumbnailsPerVideo: 1,
+      thumbnailRegenerationsPerVideo: 0,
+      styleSlots: 0,
+      videoTypes: ["explainer", "story", "list"],
+      manualScriptEditing: true,
+      allSupportedVoices: true,
+      captionPresets: false,
+      channelOverlay: false,
     },
   };
+}
+
+export interface TrustedAccessResolver {
+  resolve(userId: string): Promise<ResolvedGenerationEntitlement | null>;
+}
+
+/** Explicit non-production injection boundary used until billing owns access grants. */
+export class EnvironmentTestAccessResolver implements TrustedAccessResolver {
+  async resolve(userId: string): Promise<ResolvedGenerationEntitlement | null> {
+    if (process.env.NODE_ENV === "production") return null;
+    const raw = process.env.PHASE4_TEST_ENTITLEMENTS;
+    if (!raw) return null;
+    const grants = JSON.parse(raw) as Record<string, "trial" | "creator" | "plus">;
+    const planId = grants[userId];
+    if (!planId || !PLAN_ENTITLEMENTS[planId]) return null;
+    return {
+      accessId: `test:${userId}:${planId}`,
+      accessKind: planId === "trial" ? "verified_trial" : "subscription",
+      userId,
+      entitlement: PLAN_ENTITLEMENTS[planId],
+    };
+  }
+}
+
+export async function resolveServerGenerationAccess(
+  userId: string,
+  resolver: TrustedAccessResolver = new EnvironmentTestAccessResolver(),
+) {
+  return (await resolver.resolve(userId)) ?? resolveLegacyCompatibilityAccess(userId);
 }
 
 export class GenerationAccessUnavailableError extends Error {

@@ -3,6 +3,7 @@ export type PipelineStatus =
   | "script_generated"
   | "script_finalised"
   | "linguistic_reviewed"
+  | "awaiting_script_approval"
   | "video_spec_generated"
   | "sound_generated"
   | "video_generated"
@@ -183,6 +184,13 @@ interface ReelBase {
   costEstimateIncomplete?: boolean;
   createdAt: string;
   updatedAt: string;
+  scriptVersion: number;
+  scriptRevisionCount: number;
+  scriptApprovedAt: string | null;
+  approvedScriptFingerprint: string | null;
+  thumbnailUrl: string | null;
+  thumbnailVersions: { version: number; url: string; artifactKey: string }[] | null;
+  selectedThumbnailVersion: number | null;
 }
 
 export interface ExplainerReel extends ReelBase {
@@ -229,7 +237,11 @@ interface GenerateScriptRequestBase {
   videoModel?: VideoModel;
   autoPublish?: boolean;
   ttsVoice?: TtsVoice;
+  captionPreset?: "default" | "bold" | "minimal";
+  styleId?: string;
 }
+
+export interface ChannelStyle { id: string; name: string; channelName: string; logoUrl: string | null; captionPreset: "default" | "bold" | "minimal"; }
 
 export type GenerateScriptRequest =
   | (GenerateScriptRequestBase & { videoType?: "explainer" })
@@ -242,6 +254,19 @@ export interface GenerateScriptResponse {
   videoModel: VideoModel;
   videoType: VideoType;
   workflowVersion: number;
+}
+
+export interface GenerationEntitlements {
+  accessKind: "verified_trial" | "subscription" | "legacy_compatibility";
+  plan: {
+    id: "trial" | "creator" | "plus" | "legacy_standard";
+    aiRevisionsPerVideo: number;
+    styleSlots: number;
+    thumbnailRegenerationsPerVideo: number;
+    allSupportedVoices: boolean;
+    captionPresets: boolean;
+    channelOverlay: boolean;
+  };
 }
 
 export interface GetReelsParams {

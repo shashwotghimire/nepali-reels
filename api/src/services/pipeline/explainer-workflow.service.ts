@@ -48,7 +48,7 @@ import {
   persistWorkflowFile,
   restoreWorkflowFile,
 } from "./workflow-artifact.service";
-import { dispatchExplainerWorkflow } from "./workflow-dispatcher.service";
+import { dispatchExplainerWorkflow, WorkflowAwaitingApprovalError } from "./workflow-dispatcher.service";
 import {
   createWorkflowCheckpointPort,
   seedLegacyExplainerCheckpoints,
@@ -168,6 +168,7 @@ export async function runExplainerWorkflow(input: {
             return { persisted: "finalScript" };
           }
           case "video_spec": {
+            if (!pipeline.scriptApprovedAt || pipeline.approvedScriptFingerprint !== stableFingerprint(pipeline.finalScript)) throw new WorkflowAwaitingApprovalError();
             const finalScript = pipeline.finalScript as ScriptOutput | null;
             if (!finalScript) throw new Error("Final script checkpoint has no script");
             const { data: videoSpec } = await videoSpecGeneratorAgent(
@@ -284,7 +285,10 @@ export async function runExplainerWorkflow(input: {
               pipelineId: input.pipelineId, userId: input.userId,
               artifactKey: soundSpec.artifactKey, destination: audioPath,
             });
-            let finalPath = await compositeVideo(input.pipelineId, alignment.captions, backgroundPath);
+            let finalPath = await compositeVideo(input.pipelineId, alignment.captions, backgroundPath, [], {
+              captionPreset: pipeline.captionPreset,
+              channelStyle: pipeline.channelStyle,
+            });
             const thumbnail = output<{ artifactKey?: string; skipped?: boolean }>(outputs, "thumbnail");
             if (thumbnail?.artifactKey) {
               const thumbnailPath = path.join("src/video", `${input.pipelineId}-thumbnail.jpg`);

@@ -14,6 +14,8 @@ import ReelScriptSection from "@/components/pipeline/ReelScriptSection";
 import ReelVideoSpecSection from "@/components/pipeline/ReelVideoSpecSection";
 import ReelTypeBadge from "@/components/pipeline/ReelTypeBadge";
 import WorkflowProgress from "@/components/pipeline/WorkflowProgress";
+import ScriptApprovalPanel from "@/components/pipeline/ScriptApprovalPanel";
+import ThumbnailVersions from "@/components/pipeline/ThumbnailVersions";
 
 export default function PipelineDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,6 +95,10 @@ export default function PipelineDetail() {
         <WorkflowProgress videoType={data.videoType} progress={data.workflowProgress} />
       )}
 
+      {data.pipelineStatus === "awaiting_script_approval" && data.finalScript && (
+        <ScriptApprovalPanel key={data.scriptVersion} reel={data} />
+      )}
+
       <div className="grid gap-6 items-start lg:grid-cols-2">
         <div className="space-y-8">
           {data.draftScript && (
@@ -105,6 +111,7 @@ export default function PipelineDetail() {
         </div>
 
         <div className="space-y-6 sticky top-6 max-h-[calc(100vh-9rem)] overflow-y-auto">
+          <ThumbnailVersions reel={data} />
           {data.pipelineStatus === "sound_generated" && (
             <section className="space-y-2">
               <h2 className="text-base font-semibold">Audio</h2>

@@ -230,6 +230,7 @@ export async function executeSharedProductionStage(input: {
         alignment.captions,
         backgroundPath,
         buildCompositionOverlays(input.videoSpec.scenes),
+        { captionPreset: input.pipeline.captionPreset, channelStyle: input.pipeline.channelStyle },
       );
       const thumbnail = output<{ artifactKey?: string }>(input.outputs, "thumbnail");
       if (thumbnail?.artifactKey) {

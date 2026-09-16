@@ -8,8 +8,10 @@ import {
 import type { PipelineContentInput, PipelineStatus, VideoType } from "../../types/pipeline.types";
 import { ApiError } from "../../utils/ApiError.util";
 import { inferLegacyCompletedStages } from "../../helpers/workflow.helper";
-import { resolveLegacyCompatibilityAccess } from "./entitlement-resolution.service";
+import { resolveServerGenerationAccess } from "./entitlement-resolution.service";
 import { createWorkflowLeaseOwner } from "./workflow-checkpoint.service";
+import { resolveStyleSnapshot } from "./channel-style.service";
+import type { CaptionPreset } from "../../types/pipeline.types";
 
 /** New pipelines use the centrally configured standard generation models. */
 export const initPipelineService = async (
@@ -20,15 +22,28 @@ export const initPipelineService = async (
   ttsVoice?: string,
   videoType: VideoType = "explainer",
   contentInput: PipelineContentInput = { videoType: "explainer" },
-) => createPipeline(
-  userId,
-  topic,
-  STANDARD_GENERATION.scriptModel,
-  STANDARD_GENERATION.videoModel,
-  ttsVoice,
-  videoType,
-  contentInput,
-);
+  captionPreset: CaptionPreset = "default",
+  styleId?: string,
+) => {
+  const access = await resolveServerGenerationAccess(userId);
+  if (!access.entitlement.videoTypes.includes(videoType)) {
+    throw new ApiError(403, `${videoType} is not available for this access`, "Forbidden");
+  }
+  const selectedVoice = access.entitlement.allSupportedVoices ? (ttsVoice ?? "aoede") : "aoede";
+  const selectedCaptionPreset = access.entitlement.captionPresets ? captionPreset : "default";
+  const style = await resolveStyleSnapshot(userId, styleId);
+  return createPipeline(
+    userId,
+    topic,
+    STANDARD_GENERATION.scriptModel,
+    STANDARD_GENERATION.videoModel,
+    selectedVoice,
+    videoType,
+    contentInput,
+    style?.captionPreset ?? selectedCaptionPreset,
+    style,
+  );
+};
 
 export { markPipelineAsFailedService } from "./pipeline-failure.service";
 
@@ -38,7 +53,7 @@ type WorkflowRunInput = {
   executionKey: string;
   leaseOwner: string;
   autoPublish: boolean;
-  access: ReturnType<typeof resolveLegacyCompatibilityAccess>;
+  access: Awaited<ReturnType<typeof resolveServerGenerationAccess>>;
 };
 
 interface WorkflowDispatchDependencies {
@@ -74,7 +89,7 @@ export const dispatchPipelineService = async (
 ) => {
   const pipeline = await dependencies.findPipeline(pipelineId, userId);
   if (!pipeline) throw new ApiError(404, "Pipeline not found", "Not found");
-  const access = resolveLegacyCompatibilityAccess(userId);
+  const access = await resolveServerGenerationAccess(userId);
   const workflowInput = {
     userId,
     pipelineId,

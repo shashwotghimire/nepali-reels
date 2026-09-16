@@ -12,6 +12,8 @@ import {
   resolvePipelineAudioPathService,
 } from "../services/reels.service";
 import { getS3PresignedUrl } from "../services/s3.service";
+import { approveScriptService, editScriptService, getEntitlementsService, reviseScriptService } from "../services/pipeline/script-approval.service";
+import { regenerateThumbnailService, selectThumbnailVersionService } from "../services/pipeline/thumbnail-version.service";
 
 export const getPipelineById = asyncHandler(
   async (req: Request, res: Response) => {
@@ -162,6 +164,7 @@ export const generateScript = asyncHandler(
     const {
       topic, model, videoModel, autoPublish, ttsVoice,
       videoType = "explainer", storyInput, listInput,
+      captionPreset = "default", styleId,
     } = req.body;
     const userId = res.locals.user.id;
     const contentInput = videoType === "story"
@@ -170,7 +173,7 @@ export const generateScript = asyncHandler(
         ? { videoType, listInput }
         : { videoType: "explainer" as const };
     const pipeline = await initPipelineService(
-      userId, topic, model, videoModel, ttsVoice, videoType, contentInput,
+      userId, topic, model, videoModel, ttsVoice, videoType, contentInput, captionPreset, styleId,
     );
     await pipelineQueue.add("generate", {
       userId,
@@ -194,3 +197,37 @@ export const generateScript = asyncHandler(
       );
   },
 );
+
+export const getEntitlements = asyncHandler(async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(true, "Entitlements fetched", await getEntitlementsService(res.locals.user.id)));
+});
+
+export const editScript = asyncHandler(async (req: Request, res: Response) => {
+  const result = await editScriptService(res.locals.user.id, req.params.id as string, req.body);
+  res.status(200).json(new ApiResponse(true, "Script saved", result));
+});
+
+export const reviseScript = asyncHandler(async (req: Request, res: Response) => {
+  const idempotencyKey = req.header("Idempotency-Key");
+  if (!idempotencyKey) throw new Error("Idempotency-Key header is required");
+  const result = await reviseScriptService(res.locals.user.id, req.params.id as string, { ...req.body, idempotencyKey });
+  res.status(200).json(new ApiResponse(true, "Script revised", result));
+});
+
+export const approveScript = asyncHandler(async (req: Request, res: Response) => {
+  const pipelineId = req.params.id as string;
+  const result = await approveScriptService(res.locals.user.id, pipelineId, req.body.expectedVersion);
+  await pipelineQueue.add("resume-after-approval", { userId: res.locals.user.id, pipelineId }, {
+    jobId: `approval-${pipelineId}-v${result.scriptVersion}`,
+  });
+  res.status(202).json(new ApiResponse(true, "Script approved; production queued", result));
+});
+
+export const regenerateThumbnail = asyncHandler(async (req: Request, res: Response) => {
+  const idempotencyKey = req.header("Idempotency-Key");
+  if (!idempotencyKey) throw new Error("Idempotency-Key header is required");
+  res.status(201).json(new ApiResponse(true, "Thumbnail generated", await regenerateThumbnailService(res.locals.user.id, req.params.id as string, idempotencyKey)));
+});
+export const selectThumbnail = asyncHandler(async (req: Request, res: Response) => {
+  res.json(new ApiResponse(true, "Thumbnail selected", await selectThumbnailVersionService(res.locals.user.id, req.params.id as string, Number(req.params.version))));
+});
