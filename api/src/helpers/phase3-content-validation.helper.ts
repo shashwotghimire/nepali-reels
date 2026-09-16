@@ -79,6 +79,9 @@ export function validateStoryScript(
   if (script.treatment === "fictional") {
     if (script.factualClaims.length > 0) throw new Error("Fictional stories cannot emit factualClaims");
     if (!/(कल्पित|काल्पनिक|fiction)/iu.test(script.disclosureNp)) throw new Error("Fictional stories require an explicit fictional disclosure");
+    if (!script.narrationNp.includes(script.disclosureNp)) {
+      throw new Error("Fictional story narration must include its disclosure");
+    }
   } else if (script.factualClaims.length === 0) {
     throw new Error("Factual stories require claim source bases");
   }
@@ -110,9 +113,18 @@ export function validateStoryVideoSpec(
   input: StoryInput,
   spec: StoryVideoSpec,
   maximumSeconds = PHASE3_MAX_PHYSICAL_DURATION_SECONDS,
+  requiredDisclosure?: string,
 ): void {
   assertMaximum(maximumSeconds);
   if (spec.treatment !== input.treatment) throw new Error("Story video treatment changed during composition");
+  if (input.treatment === "fictional") {
+    if (!requiredDisclosure?.trim()) {
+      throw new Error("Fictional story video validation requires the approved disclosure");
+    }
+    if (!spec.voiceoverText.includes(requiredDisclosure)) {
+      throw new Error("Fictional story voiceover must retain the approved fictional disclosure");
+    }
+  }
   assertTiledScenes(spec.scenes, maximumSeconds);
   const characterIds = spec.characterBible.map((entry) => entry.id);
   const locationIds = spec.locationBible.map((entry) => entry.id);

@@ -73,6 +73,42 @@ export async function renderCaptionFrames(
   return results;
 }
 
+/** Render timed emphasis text near the top, independently of narration captions. */
+export async function renderOverlayFrames(
+  overlays: Caption[],
+  outputDir: string,
+): Promise<CaptionFrame[]> {
+  const results: CaptionFrame[] = [];
+
+  for (let i = 0; i < overlays.length; i++) {
+    const overlay = overlays[i]!;
+    const canvas = new Canvas(VIDEO_W, VIDEO_H);
+    const ctx = canvas.getContext("2d");
+    ctx.font = "bold 58px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const lines = wrapLines(ctx, overlay.text);
+    const boxHeight = Math.max(150, lines.length * 72 + 44);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+    ctx.fillRect(48, 92, VIDEO_W - 96, boxHeight);
+    for (let line = 0; line < lines.length; line++) {
+      const y = 92 + 22 + 36 + line * 72;
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = "#000000";
+      ctx.strokeText(lines[line]!, VIDEO_W / 2, y);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(lines[line]!, VIDEO_W / 2, y);
+    }
+
+    const pngPath = path.join(outputDir, `overlay-${i}.png`);
+    await writeFile(pngPath, await canvas.toBuffer("png"));
+    results.push({ pngPath, startSec: overlay.startSec, endSec: overlay.endSec });
+  }
+
+  return results;
+}
+
 export async function cleanupCaptionFrames(frames: CaptionFrame[]): Promise<void> {
   await Promise.all(frames.map((f) => unlink(f.pngPath).catch(() => {})));
 }

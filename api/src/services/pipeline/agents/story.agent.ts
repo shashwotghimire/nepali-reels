@@ -149,7 +149,11 @@ export const storyVideoSpecGeneratorAgent = async (
     outputTokens: 8_192,
   }));
   if (!response.parsed_output) throw new Error("Story video spec generator returned null output");
-  validateStoryVideoSpec(input, response.parsed_output, duration.maximumDurationSeconds);
+  validateStoryVideoSpec(
+    input,
+    response.parsed_output,
+    duration.maximumDurationSeconds,
+    script.disclosureNp,
+  );
   return { data: response.parsed_output, usage: extractLlmUsage(response) };
 };
-

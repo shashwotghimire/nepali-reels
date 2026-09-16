@@ -14,7 +14,7 @@ export const storyReviewScript: StoryScriptOutput = {
   locations: [{ id: "trail", stableDescription: "बिहानीको हिमाली ढुंगे बाटो" }],
   hookOptions: [{ text: "घण्टी आफैं किन बज्यो?", style: "question" }, { text: "माया एक्लै थिइन्।", style: "tension" }, { text: "बाटोले रहस्य लुकाएको थियो।", style: "surprise" }],
   selectedHook: "घण्टी आफैं किन बज्यो?",
-  narrationNp: "घण्टी आफैं किन बज्यो? माया सुनसान बाटोमा रोकिइन्। आवाज पछ्याउँदा उनले हराएको चौँरी भेटिन्। बिहानसम्म दुवै सुरक्षित गाउँ पुगे।",
+  narrationNp: "घण्टी आफैं किन बज्यो? यो पूर्ण रूपमा काल्पनिक कथा हो। माया सुनसान बाटोमा रोकिइन्। आवाज पछ्याउँदा उनले हराएको चौँरी भेटिन्। बिहानसम्म दुवै सुरक्षित गाउँ पुगे।",
   shotPlan: [
     { index: 1, durationSec: 5, beat: "hook", narrationNp: "घण्टी आफैं किन बज्यो?", visual: "misty trail", cameraOrMotion: "slow push", characterIds: ["maya"], locationId: "trail", continuityNote: "blue shawl, dawn mist" },
     { index: 2, durationSec: 5, beat: "setup", narrationNp: "माया रोकिइन्।", visual: "traveler listens", cameraOrMotion: "pan", characterIds: ["maya"], locationId: "trail", continuityNote: "same shawl and light" },

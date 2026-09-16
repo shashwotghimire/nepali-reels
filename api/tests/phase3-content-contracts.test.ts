@@ -7,6 +7,7 @@ import {
   validateStoryVideoSpec,
 } from "../src/helpers/phase3-content-validation.helper";
 import { generateScriptBodySchema } from "../src/validations/pipeline.validation";
+import { buildCompositionOverlays } from "../src/helpers/composition-overlay.helper";
 import {
   factualStoryInput,
   factualStoryScript,
@@ -22,9 +23,29 @@ test("factual and fictional stories keep their treatment and continuity contract
   assert.doesNotThrow(() => validateStoryScript(factualStoryInput, factualStoryScript, 74));
   assert.doesNotThrow(() => validateStoryVideoSpec(factualStoryInput, factualStoryVideoSpec, 74));
   assert.doesNotThrow(() => validateStoryScript(fictionalStoryInput, fictionalStoryScript, 74));
+  assert.doesNotThrow(() => validateStoryVideoSpec(fictionalStoryInput, {
+    ...factualStoryVideoSpec,
+    treatment: "fictional",
+    voiceoverText: fictionalStoryScript.narrationNp,
+  }, 74, fictionalStoryScript.disclosureNp));
   assert.throws(
     () => validateStoryScript(fictionalStoryInput, { ...fictionalStoryScript, disclosureNp: "कथा" }, 74),
     /fictional disclosure/,
+  );
+  assert.throws(
+    () => validateStoryScript(fictionalStoryInput, {
+      ...fictionalStoryScript,
+      narrationNp: fictionalStoryScript.selectedHook,
+    }, 74),
+    /narration must include its disclosure/,
+  );
+  assert.throws(
+    () => validateStoryVideoSpec(fictionalStoryInput, {
+      ...factualStoryVideoSpec,
+      treatment: "fictional",
+      voiceoverText: "घण्टीको आवाज आयो।",
+    }, 74, fictionalStoryScript.disclosureNp),
+    /voiceover must retain/,
   );
   assert.throws(
     () => validateStoryVideoSpec(factualStoryInput, {
@@ -40,6 +61,10 @@ test("factual and fictional stories keep their treatment and continuity contract
 test("list contracts preserve exact count, direction, numbering and scene composition", () => {
   assert.doesNotThrow(() => validateListScript(listInput, listScript, 74));
   assert.doesNotThrow(() => validateListVideoSpec(listInput, listVideoSpec, 74));
+  assert.deepEqual(
+    buildCompositionOverlays(listVideoSpec.scenes).map((overlay) => overlay.text),
+    ["3 · स्थान ३", "2 · स्थान २", "1 · स्थान १"],
+  );
   assert.throws(
     () => validateListScript(listInput, {
       ...listScript,

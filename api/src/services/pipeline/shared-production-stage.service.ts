@@ -33,6 +33,7 @@ import { uploadToTiktokService } from "../tiktok.service";
 import type { MeteringContext } from "./llm-metering";
 import type { WorkflowStageLease } from "./workflow-dispatcher.service";
 import type { createExplainerDurationPolicy } from "./explainer-duration-policy.service";
+import { buildCompositionOverlays } from "../../helpers/composition-overlay.helper";
 
 export interface ProductionScene {
   startSec: number;
@@ -225,7 +226,11 @@ export async function executeSharedProductionStage(input: {
         destination: audioPath,
       });
       let finalPath = await compositeVideo(
-        input.pipelineId, alignment.captions, backgroundPath,
+        input.pipelineId,
+        alignment.captions,
+        backgroundPath,
+        buildCompositionOverlays(input.videoSpec.scenes),
+        input.videoSpec.scenes.at(-1)?.endSec,
       );
       const thumbnail = output<{ artifactKey?: string }>(input.outputs, "thumbnail");
       if (thumbnail?.artifactKey) {

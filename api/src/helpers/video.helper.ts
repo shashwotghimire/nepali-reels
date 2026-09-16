@@ -4,7 +4,7 @@ import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import type { Caption } from "../types/subtitle.types";
-import { renderCaptionFrames, cleanupCaptionFrames } from "./subtitle-renderer";
+import { renderCaptionFrames, renderOverlayFrames, cleanupCaptionFrames } from "./subtitle-renderer";
 import {
   AI_VIDEO_MAX_TOTAL_DURATION,
   VIDEO_W,
@@ -126,6 +126,20 @@ function scaleCaptions(captions: Caption[], actualDuration: number): Caption[] {
   }));
 }
 
+function scaleTimedOverlays(
+  overlays: Caption[],
+  actualDuration: number,
+  plannedDuration: number,
+): Caption[] {
+  if (overlays.length === 0) return [];
+  const scale = actualDuration / plannedDuration;
+  return overlays.map((overlay) => ({
+    ...overlay,
+    startSec: overlay.startSec * scale,
+    endSec: overlay.endSec * scale,
+  }));
+}
+
 export async function burnThumbnailIntoVideo(
   videoPath: string,
   thumbnailBuffer: Buffer,
@@ -212,6 +226,8 @@ export async function compositeVideo(
   pipelineId: string,
   captions: Caption[],
   videoInputPath: string,
+  timedOverlays: Caption[] = [],
+  plannedDurationSeconds?: number,
 ): Promise<string> {
   const audioInput = `src/audio/${pipelineId}.wav`;
   const output = `src/video/${pipelineId}-output.mp4`;
@@ -224,14 +240,22 @@ export async function compositeVideo(
   const duration = await getAudioDuration(audioInput);
 
   const scaled = scaleCaptions(captions, duration);
+  const scaledOverlays = scaleTimedOverlays(
+    timedOverlays,
+    duration,
+    plannedDurationSeconds ?? duration,
+  );
   await fs.promises.mkdir(temporaryFrameDir, { recursive: true });
-  const frames = await renderCaptionFrames(scaled, temporaryFrameDir);
+  const captionFrames = await renderCaptionFrames(scaled, temporaryFrameDir);
+  const overlayFrames = await renderOverlayFrames(scaledOverlays, temporaryFrameDir);
+  const frames = [...captionFrames, ...overlayFrames];
 
   // [0:v] scale+pad → [base]; then chain overlays: [base][2:v]overlay→[v1], [v1][3:v]overlay→[v2], ...
   // Input indices: 0=video, 1=audio, 2..N=caption PNGs
   let filterParts: string[] = [
     `[0:v]scale=${VIDEO_W}:${VIDEO_H}:force_original_aspect_ratio=decrease,pad=${VIDEO_W}:${VIDEO_H}:(ow-iw)/2:(oh-ih)/2[base]`,
   ];
+  if (frames.length === 0) filterParts.push("[base]null[vout]");
   for (let i = 0; i < frames.length; i++) {
     const f = frames[i]!;
     const inLabel = i === 0 ? "[base]" : `[v${i}]`;

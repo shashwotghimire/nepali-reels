@@ -39,6 +39,7 @@ export const fictionalStoryScript: StoryScriptOutput = {
   treatment: "fictional",
   disclosureNp: "यो पूर्ण रूपमा काल्पनिक कथा हो।",
   factualClaims: [],
+  narrationNp: `${factualStoryScript.selectedHook} यो पूर्ण रूपमा काल्पनिक कथा हो। अभिलेख होइन, कल्पनाले यात्रुलाई शिखरसम्म पुर्‍याउँछ।`,
 };
 
 export const factualStoryVideoSpec: StoryVideoSpec = {

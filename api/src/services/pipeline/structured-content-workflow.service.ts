@@ -143,7 +143,12 @@ async function runStoryWorkflow(input: WorkflowInput) {
               storyInput, finalScript, pipeline.claudeModel, metering,
               durationPolicy.promptDuration,
             );
-            validateStoryVideoSpec(storyInput, videoSpec, durationPolicy.promptDuration.maximumDurationSeconds);
+            validateStoryVideoSpec(
+              storyInput,
+              videoSpec,
+              durationPolicy.promptDuration.maximumDurationSeconds,
+              finalScript.disclosureNp,
+            );
             durationPolicy.validateVideoSpec(videoSpec);
             await saveVideoSpec(input.pipelineId, input.userId, videoSpec, lease);
             await syncCost(input, lease);
