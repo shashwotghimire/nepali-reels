@@ -56,6 +56,8 @@ Acceptance: reviewed migrations and tests, no secrets/live DB changes, unchanged
 
 ## Phase 3 — Distinct Story and List workflows
 
+Implementation status: completed in code on 2026-09-16 and awaiting user review. No live provider spend, live migration, deployment, or publication was performed.
+
 - Dedicated input/output schemas, prompts, stage orders, pacing, composition, and validations.
 - Story continuity and factual/fictional treatment; List structured items/numbering.
 - Reuse shared TTS/alignment/render/storage/publishing services.

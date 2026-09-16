@@ -1,7 +1,7 @@
 import {
   EXPLAINER_STAGES,
   EXPLAINER_WORKFLOW_VERSION,
-  type ExplainerStage,
+  type WorkflowStage,
 } from "../../helpers/workflow.helper";
 import {
   WorkflowLeaseLostError,
@@ -23,26 +23,26 @@ export interface WorkflowCheckpointPort {
     pipelineId: string;
     userId: string;
     workflowVersion: number;
-    stage: ExplainerStage;
+    stage: WorkflowStage;
     executionKey: string;
   }): Promise<StageClaim>;
   renew?(input: {
     pipelineId: string;
     workflowVersion: number;
-    stage: ExplainerStage;
+    stage: WorkflowStage;
     executionKey: string;
   }): Promise<void>;
   complete(input: {
     pipelineId: string;
     workflowVersion: number;
-    stage: ExplainerStage;
+    stage: WorkflowStage;
     executionKey: string;
     output?: object | null;
   }): Promise<void>;
   fail(input: {
     pipelineId: string;
     workflowVersion: number;
-    stage: ExplainerStage;
+    stage: WorkflowStage;
     executionKey: string;
     error: string;
   }): Promise<void>;
@@ -50,14 +50,14 @@ export interface WorkflowCheckpointPort {
 
 export interface WorkflowStageExecutor {
   execute(
-    stage: ExplainerStage,
-    completedOutputs: ReadonlyMap<ExplainerStage, object | null>,
+    stage: WorkflowStage,
+    completedOutputs: ReadonlyMap<WorkflowStage, object | null>,
     lease?: WorkflowStageLease,
   ): Promise<object | null | void>;
 }
 
 export class WorkflowAlreadyRunningError extends Error {
-  constructor(readonly stage: ExplainerStage) {
+  constructor(readonly stage: WorkflowStage) {
     super(`Workflow stage ${stage} is already running`);
     this.name = "WorkflowAlreadyRunningError";
   }
@@ -85,12 +85,29 @@ export async function dispatchExplainerWorkflow(input: {
   checkpoints: WorkflowCheckpointPort;
   executor: WorkflowStageExecutor;
 }): Promise<void> {
-  const completedOutputs = new Map<ExplainerStage, object | null>();
-  for (const stage of EXPLAINER_STAGES) {
+  return dispatchWorkflow({
+    ...input,
+    workflowVersion: EXPLAINER_WORKFLOW_VERSION,
+    stages: EXPLAINER_STAGES,
+  });
+}
+
+/** Shared durable dispatcher; each reel type supplies its own ordered stages. */
+export async function dispatchWorkflow(input: {
+  pipelineId: string;
+  userId: string;
+  executionKey: string;
+  workflowVersion: number;
+  stages: readonly WorkflowStage[];
+  checkpoints: WorkflowCheckpointPort;
+  executor: WorkflowStageExecutor;
+}): Promise<void> {
+  const completedOutputs = new Map<WorkflowStage, object | null>();
+  for (const stage of input.stages) {
     const claim = await input.checkpoints.claim({
       pipelineId: input.pipelineId,
       userId: input.userId,
-      workflowVersion: EXPLAINER_WORKFLOW_VERSION,
+      workflowVersion: input.workflowVersion,
       stage,
       executionKey: input.executionKey,
     });
@@ -105,7 +122,7 @@ export async function dispatchExplainerWorkflow(input: {
       const renew = input.checkpoints.renew;
       const renewalInput = {
         pipelineId: input.pipelineId,
-        workflowVersion: EXPLAINER_WORKFLOW_VERSION,
+        workflowVersion: input.workflowVersion,
         stage,
         executionKey: input.executionKey,
       };
@@ -121,7 +138,7 @@ export async function dispatchExplainerWorkflow(input: {
       await claim.lease?.assertOwned();
       await input.checkpoints.complete({
         pipelineId: input.pipelineId,
-        workflowVersion: EXPLAINER_WORKFLOW_VERSION,
+        workflowVersion: input.workflowVersion,
         stage,
         executionKey: input.executionKey,
         output,
@@ -132,7 +149,7 @@ export async function dispatchExplainerWorkflow(input: {
       // rely on repository fencing to leave the successor's row untouched.
       await input.checkpoints.fail({
         pipelineId: input.pipelineId,
-        workflowVersion: EXPLAINER_WORKFLOW_VERSION,
+        workflowVersion: input.workflowVersion,
         stage,
         executionKey: input.executionKey,
         error: error instanceof Error ? error.message : String(error),

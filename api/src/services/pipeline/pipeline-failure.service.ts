@@ -1,7 +1,6 @@
-import { savePipelineCost } from "../../repositories/reels.repository";
+import { findPipelineById, savePipelineCost } from "../../repositories/reels.repository";
 import { getPipelineCostSummary } from "../../repositories/provider-usage.repository";
 import { markPipelineFailedIfExecutionOwned } from "../../repositories/workflow-execution.repository";
-import { EXPLAINER_WORKFLOW_VERSION } from "../../helpers/workflow.helper";
 
 export const markPipelineAsFailedService = async (
   pipelineId: string,
@@ -9,10 +8,12 @@ export const markPipelineAsFailedService = async (
   userId: string,
   ownership: { executionKey: string; leaseOwner: string },
 ) => {
+  const pipeline = await findPipelineById(pipelineId, userId);
+  if (!pipeline) return false;
   const transitioned = await markPipelineFailedIfExecutionOwned({
     pipelineId,
     userId,
-    workflowVersion: EXPLAINER_WORKFLOW_VERSION,
+    workflowVersion: pipeline.workflowVersion,
     executionKey: ownership.executionKey,
     leaseOwner: ownership.leaseOwner,
     ...(failureReason ? { failureReason } : {}),

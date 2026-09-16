@@ -159,9 +159,19 @@ export const retryPipeline = asyncHandler(
 
 export const generateScript = asyncHandler(
   async (req: Request, res: Response) => {
-    const { topic, model, videoModel, autoPublish, ttsVoice } = req.body;
+    const {
+      topic, model, videoModel, autoPublish, ttsVoice,
+      videoType = "explainer", storyInput, listInput,
+    } = req.body;
     const userId = res.locals.user.id;
-    const pipeline = await initPipelineService(userId, topic, model, videoModel, ttsVoice);
+    const contentInput = videoType === "story"
+      ? { videoType, storyInput }
+      : videoType === "list"
+        ? { videoType, listInput }
+        : { videoType: "explainer" as const };
+    const pipeline = await initPipelineService(
+      userId, topic, model, videoModel, ttsVoice, videoType, contentInput,
+    );
     await pipelineQueue.add("generate", {
       userId,
       pipelineId: pipeline.id,

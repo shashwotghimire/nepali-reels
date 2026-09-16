@@ -8,7 +8,7 @@ import {
 } from "sequelize";
 import sequelize from "../configs/db.config";
 import User from "./users.model";
-import type { PipelineStatus } from "../types/pipeline.types";
+import type { PipelineContentInput, PipelineStatus, VideoType } from "../types/pipeline.types";
 
 export class Reels extends Model<
   InferAttributes<Reels>,
@@ -19,7 +19,8 @@ export class Reels extends Model<
   declare topic: string;
   declare claudeModel: string;
   declare videoModel: string;
-  declare videoType: CreationOptional<"explainer">;
+  declare videoType: CreationOptional<VideoType>;
+  declare contentInput: CreationOptional<PipelineContentInput>;
   declare workflowVersion: CreationOptional<number>;
   declare draftScript: CreationOptional<object | null>;
   declare finalScript: CreationOptional<object | null>;
@@ -71,6 +72,11 @@ Reels.init(
       type: DataTypes.STRING,
       allowNull: false,
       defaultValue: "explainer",
+    },
+    contentInput: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: { videoType: "explainer" },
     },
     workflowVersion: {
       type: DataTypes.INTEGER,

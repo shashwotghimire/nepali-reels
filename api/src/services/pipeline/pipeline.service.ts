@@ -5,7 +5,7 @@ import {
   findPipelineById,
   resetPipelineForRetry,
 } from "../../repositories/reels.repository";
-import type { PipelineStatus } from "../../types/pipeline.types";
+import type { PipelineContentInput, PipelineStatus, VideoType } from "../../types/pipeline.types";
 import { ApiError } from "../../utils/ApiError.util";
 import { inferLegacyCompletedStages } from "../../helpers/workflow.helper";
 import { resolveLegacyCompatibilityAccess } from "./entitlement-resolution.service";
@@ -18,15 +18,51 @@ export const initPipelineService = async (
   _model?: string,
   _videoModel?: string,
   ttsVoice?: string,
+  videoType: VideoType = "explainer",
+  contentInput: PipelineContentInput = { videoType: "explainer" },
 ) => createPipeline(
   userId,
   topic,
   STANDARD_GENERATION.scriptModel,
   STANDARD_GENERATION.videoModel,
   ttsVoice,
+  videoType,
+  contentInput,
 );
 
 export { markPipelineAsFailedService } from "./pipeline-failure.service";
+
+type WorkflowRunInput = {
+  userId: string;
+  pipelineId: string;
+  executionKey: string;
+  leaseOwner: string;
+  autoPublish: boolean;
+  access: ReturnType<typeof resolveLegacyCompatibilityAccess>;
+};
+
+interface WorkflowDispatchDependencies {
+  findPipeline: typeof findPipelineById;
+  runExplainer(input: WorkflowRunInput): Promise<unknown>;
+  runStory(input: WorkflowRunInput): Promise<unknown>;
+  runList(input: WorkflowRunInput): Promise<unknown>;
+}
+
+const workflowDispatchDependencies: WorkflowDispatchDependencies = {
+  findPipeline: findPipelineById,
+  runExplainer: async (input) => {
+    const { runExplainerWorkflow } = await import("./explainer-workflow.service.js");
+    return runExplainerWorkflow(input);
+  },
+  runStory: async (input) => {
+    const { runStoryWorkflow } = await import("./structured-content-workflow.service.js");
+    return runStoryWorkflow(input);
+  },
+  runList: async (input) => {
+    const { runListWorkflow } = await import("./structured-content-workflow.service.js");
+    return runListWorkflow(input);
+  },
+};
 
 export const dispatchPipelineService = async (
   userId: string,
@@ -34,16 +70,32 @@ export const dispatchPipelineService = async (
   executionKey: string,
   autoPublish = false,
   leaseOwner = createWorkflowLeaseOwner(executionKey),
+  dependencies: WorkflowDispatchDependencies = workflowDispatchDependencies,
 ) => {
-  const { runExplainerWorkflow } = await import("./explainer-workflow.service.js");
-  return runExplainerWorkflow({
+  const pipeline = await dependencies.findPipeline(pipelineId, userId);
+  if (!pipeline) throw new ApiError(404, "Pipeline not found", "Not found");
+  const access = resolveLegacyCompatibilityAccess(userId);
+  const workflowInput = {
     userId,
     pipelineId,
     executionKey,
     leaseOwner,
     autoPublish,
-    access: resolveLegacyCompatibilityAccess(userId),
-  });
+    access,
+  };
+  switch (pipeline.videoType) {
+    case "explainer": {
+      return dependencies.runExplainer(workflowInput);
+    }
+    case "story": {
+      return dependencies.runStory(workflowInput);
+    }
+    case "list": {
+      return dependencies.runList(workflowInput);
+    }
+    default:
+      throw new Error(`Unsupported video type ${String(pipeline.videoType)}`);
+  }
 };
 
 export const createPipelineService = async (
@@ -85,20 +137,25 @@ export const retryPipelineService = async (
     throw new ApiError(400, "Pipeline is not in failed state", "Cannot retry");
   }
 
-  const completed = inferLegacyCompletedStages(pipeline);
-  const resumeFrom: PipelineStatus = completed.includes("publish")
+  const completed = pipeline.videoType === "explainer"
+    ? inferLegacyCompletedStages(pipeline)
+    : [];
+  const soundSpec = pipeline.soundSpec as { artifactKey?: string } | null;
+  const resumeFrom: PipelineStatus = pipeline.tiktokPublishId
     ? "publish_pending"
-    : completed.includes("upload")
+    : pipeline.s3key
       ? "video_generated"
-      : completed.includes("audio")
+      : soundSpec?.artifactKey
         ? "sound_generated"
-        : completed.includes("video_spec")
+        : pipeline.videoSpec
           ? "video_spec_generated"
-          : completed.includes("fact_check")
+          : pipeline.finalScript
             ? "script_finalised"
-            : completed.includes("script")
+            : pipeline.draftScript
               ? "script_generated"
-              : "queued";
+              : completed.includes("publish")
+                ? "publish_pending"
+                : "queued";
   await dependencies.resetPipeline(pipelineId, userId, resumeFrom);
   return { resumeFrom, pipelineId };
 };

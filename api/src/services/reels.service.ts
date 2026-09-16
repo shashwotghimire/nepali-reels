@@ -7,6 +7,36 @@ import { ApiError } from "../utils/ApiError.util";
 import fs from "node:fs";
 import path from "node:path";
 import { restoreWorkflowFile } from "./pipeline/workflow-artifact.service";
+import { findWorkflowStageAttempts } from "../repositories/workflow-execution.repository";
+import { WORKFLOW_STAGES_BY_TYPE, type WorkflowStage } from "../helpers/workflow.helper";
+import type { VideoType } from "../types/pipeline.types";
+
+async function attachWorkflowProgress<T extends {
+  id: string;
+  userId: string;
+  videoType: VideoType;
+  workflowVersion: number;
+}>(pipeline: T) {
+  const attempts = await findWorkflowStageAttempts({
+    pipelineId: pipeline.id,
+    userId: pipeline.userId,
+    workflowVersion: pipeline.workflowVersion,
+  });
+  const orderedStages = WORKFLOW_STAGES_BY_TYPE[pipeline.videoType] as readonly WorkflowStage[];
+  const latest = new Map<string, (typeof attempts)[number]>();
+  for (const attempt of attempts) latest.set(attempt.stage, attempt);
+  const stages = orderedStages.map((stage) => ({
+    stage,
+    status: latest.get(stage)?.status ?? "pending",
+  }));
+  const active = stages.find((stage) => stage.status === "running" || stage.status === "failed")
+    ?? stages.find((stage) => stage.status === "pending");
+  return {
+    orderedStages,
+    currentStage: active?.stage ?? null,
+    stages,
+  };
+}
 
 export const getPipelineByIdService = async (
   userId: string,
@@ -16,14 +46,19 @@ export const getPipelineByIdService = async (
   if (!pipeline) {
     throw new ApiError(404, "Pipeline not found", "Pipeline not found");
   }
-  return pipeline;
+  const plain = pipeline.toJSON();
+  return {
+    ...plain,
+    workflowProgress: await attachWorkflowProgress(plain),
+  };
 };
 
 export const resolvePipelineAudioPathService = async (
   userId: string,
   pipelineId: string,
 ): Promise<string | null> => {
-  const pipeline = await getPipelineByIdService(userId, pipelineId);
+  const pipeline = await findPipelineById(pipelineId, userId);
+  if (!pipeline) throw new ApiError(404, "Pipeline not found", "Pipeline not found");
   const audioPath = path.resolve(`src/audio/${pipelineId}.wav`);
   if (fs.existsSync(audioPath)) return audioPath;
 

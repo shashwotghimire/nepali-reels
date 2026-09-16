@@ -22,7 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGenerateScript } from "@/hooks/api/usePipeline";
-import type { ClaudeModel, VideoModel, TtsVoice } from "@/types/api/pipeline-api.types";
+import type { ClaudeModel, GenerateScriptRequest, ListInput, StoryInput, VideoModel, VideoType, TtsVoice } from "@/types/api/pipeline-api.types";
+import VideoTypeSelector from "./VideoTypeSelector";
+import VideoTypeFields from "./VideoTypeFields";
 
 const CLAUDE_MODELS: { value: ClaudeModel; label: string }[] = [
   {
@@ -63,27 +65,48 @@ const TTS_VOICES: { value: TtsVoice; label: string }[] = [
 ];
 
 const DEFAULT_TTS_VOICE: TtsVoice = "aoede";
+const DEFAULT_STORY_INPUT: StoryInput = { treatment: "factual" };
+const DEFAULT_LIST_INPUT: ListInput = { itemCount: 5, order: "descending" };
 
 export default function CreateReelButton() {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState("");
+  const [videoType, setVideoType] = useState<VideoType>("explainer");
+  const [storyInput, setStoryInput] = useState<StoryInput>(DEFAULT_STORY_INPUT);
+  const [listInput, setListInput] = useState<ListInput>(DEFAULT_LIST_INPUT);
   const [model, setModel] = useState<ClaudeModel>(DEFAULT_MODEL);
   const [videoModel, setVideoModel] = useState<VideoModel>(DEFAULT_VIDEO_MODEL);
   const [ttsVoice, setTtsVoice] = useState<TtsVoice>(DEFAULT_TTS_VOICE);
   const [autoPublish, setAutoPublish] = useState(false);
 
   const { mutate, isPending } = useGenerateScript();
+  const hasValidInput = !!topic.trim() && (
+    videoType !== "list" ||
+    (Number.isInteger(listInput.itemCount) && listInput.itemCount >= 3 && listInput.itemCount <= 10)
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topic.trim()) return;
+    if (!hasValidInput) return;
+    const commonInput = {
+      topic: topic.trim(), model, videoModel, autoPublish, ttsVoice,
+    };
+    const request: GenerateScriptRequest = videoType === "story"
+      ? { ...commonInput, videoType, storyInput }
+      : videoType === "list"
+        ? { ...commonInput, videoType, listInput }
+        : { ...commonInput, videoType };
+
     mutate(
-      { topic: topic.trim(), model, videoModel, autoPublish, ttsVoice },
+      request,
       {
         onSuccess: () => {
           toast.success("Pipeline queued successfully");
           setOpen(false);
           setTopic("");
+          setVideoType("explainer");
+          setStoryInput(DEFAULT_STORY_INPUT);
+          setListInput(DEFAULT_LIST_INPUT);
           setModel(DEFAULT_MODEL);
           setVideoModel(DEFAULT_VIDEO_MODEL);
           setTtsVoice(DEFAULT_TTS_VOICE);
@@ -114,6 +137,21 @@ export default function CreateReelButton() {
           </AlertDialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 ">
+            <VideoTypeSelector
+              value={videoType}
+              onChange={setVideoType}
+              disabled={isPending}
+            />
+
+            <VideoTypeFields
+              videoType={videoType}
+              storyInput={storyInput}
+              listInput={listInput}
+              onStoryInputChange={setStoryInput}
+              onListInputChange={setListInput}
+              disabled={isPending}
+            />
+
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Topic</label>
               <Input
@@ -206,7 +244,7 @@ export default function CreateReelButton() {
 
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-              <Button type="submit" disabled={!topic.trim() || isPending}>
+              <Button type="submit" disabled={!hasValidInput || isPending}>
                 {isPending ? "Starting pipeline…" : "Start pipeline"}
               </Button>
             </AlertDialogFooter>

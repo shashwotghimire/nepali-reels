@@ -10,169 +10,10 @@ import {
   getPipelineVideoUrl,
 } from "@/services/pipeline.service";
 import TikTokPublishForm from "@/components/tiktok/TikTokPublishForm";
-import type { ScriptOutput, VideoSpec } from "@/types/api/pipeline-api.types";
-
-function ScriptSection({
-  title,
-  script,
-}: {
-  title: string;
-  script: ScriptOutput;
-}) {
-  return (
-    <section className="space-y-4">
-      <h2 className="text-base font-semibold">{title}</h2>
-      <div className="rounded-lg border divide-y">
-        <div className="p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Title options
-          </p>
-          <ul className="space-y-1">
-            {script.titleOptions.map((t, i) => (
-              <li key={i} className="text-sm">
-                {t}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Hook
-          </p>
-          <p className="text-sm">{script.selectedHook}</p>
-        </div>
-
-        <div className="p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Narration
-          </p>
-          <p className="text-sm leading-relaxed">{script.narrationNp}</p>
-        </div>
-
-        <div className="p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Description
-          </p>
-          <p className="text-sm leading-relaxed">
-            {script.platformDescription}
-          </p>
-        </div>
-
-        <div className="p-4 space-y-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Shot plan
-          </p>
-          <div className="space-y-2">
-            {script.shotPlan.map((shot) => (
-              <div key={shot.index} className="flex gap-3 text-sm">
-                <span className="text-muted-foreground w-5 shrink-0">
-                  {shot.index}.
-                </span>
-                <div className="space-y-0.5">
-                  <p>{shot.visual}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {shot.cameraOrMotion} · {shot.durationSec}s
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-4 space-y-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Captions
-          </p>
-          <div className="space-y-1">
-            {script.captions.map((c, i) => (
-              <div key={i} className="flex gap-3 text-sm">
-                <span className="text-muted-foreground shrink-0 tabular-nums">
-                  {c.startSec}s–{c.endSec}s
-                </span>
-                <span>{c.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-
-        <div className="p-4 space-y-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Hashtags
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {script.hashtags.map((tag, i) => (
-              <Badge
-                key={i}
-                variant="secondary"
-                className="text-xs font-normal"
-              >
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-4">
-          <p className="text-xs text-muted-foreground">
-            Estimated duration: {script.estDurationSec}s
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function VideoSpecSection({ spec }: { spec: VideoSpec }) {
-  return (
-    <section className="space-y-4">
-      <h2 className="text-base font-semibold">Video spec</h2>
-      <div className="rounded-lg border divide-y">
-        <div className="p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Voiceover
-          </p>
-          <p className="text-sm leading-relaxed">{spec.voiceoverText}</p>
-        </div>
-
-        <div className="p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Thumbnail text
-          </p>
-          <p className="text-sm">{spec.thumbnailText}</p>
-        </div>
-
-        <div className="p-4 space-y-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Music direction
-          </p>
-          <p className="text-sm">{spec.musicDirection}</p>
-        </div>
-
-        <div className="p-4 space-y-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Scenes
-          </p>
-          <div className="space-y-3">
-            {spec.scenes.map((scene, i) => (
-              <div key={i} className="space-y-1">
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {scene.startSec}s–{scene.endSec}s
-                </p>
-                <p className="text-sm">{scene.bgPrompt}</p>
-                <p className="text-xs text-muted-foreground">
-                  "{scene.captionText}"
-                  {scene.onScreenText && ` · ${scene.onScreenText}`}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+import ReelScriptSection from "@/components/pipeline/ReelScriptSection";
+import ReelVideoSpecSection from "@/components/pipeline/ReelVideoSpecSection";
+import ReelTypeBadge from "@/components/pipeline/ReelTypeBadge";
+import WorkflowProgress from "@/components/pipeline/WorkflowProgress";
 
 export default function PipelineDetail() {
   const { id } = useParams<{ id: string }>();
@@ -217,6 +58,7 @@ export default function PipelineDetail() {
           <p className="text-xs text-muted-foreground mt-0.5">
             {new Date(data.createdAt).toLocaleString()}
           </p>
+          <div className="mt-2"><ReelTypeBadge videoType={data.videoType} /></div>
         </div>
         <div className="flex flex-col items-end gap-1">
           <Badge variant={PIPELINE_STATUS_VARIANT[data.pipelineStatus]}>
@@ -247,15 +89,19 @@ export default function PipelineDetail() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6 items-start">
+      {data.workflowProgress && (
+        <WorkflowProgress videoType={data.videoType} progress={data.workflowProgress} />
+      )}
+
+      <div className="grid gap-6 items-start lg:grid-cols-2">
         <div className="space-y-8">
           {data.draftScript && (
-            <ScriptSection title="Draft script" script={data.draftScript} />
+            <ReelScriptSection title="Draft script" script={data.draftScript} videoType={data.videoType} />
           )}
           {data.finalScript && (
-            <ScriptSection title="Final script" script={data.finalScript} />
+            <ReelScriptSection title="Final script" script={data.finalScript} videoType={data.videoType} />
           )}
-          {data.videoSpec && <VideoSpecSection spec={data.videoSpec} />}
+          {data.videoSpec && <ReelVideoSpecSection spec={data.videoSpec} videoType={data.videoType} />}
         </div>
 
         <div className="space-y-6 sticky top-6 max-h-[calc(100vh-9rem)] overflow-y-auto">

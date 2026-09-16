@@ -29,6 +29,21 @@ export interface SeedSucceededWorkflowStage {
   output?: object | null;
 }
 
+export async function findWorkflowStageAttempts(input: {
+  pipelineId: string;
+  userId: string;
+  workflowVersion: number;
+}) {
+  await requireOwnedPipeline(input.pipelineId, input.userId);
+  return WorkflowStageAttempt.findAll({
+    where: {
+      pipelineId: input.pipelineId,
+      workflowVersion: input.workflowVersion,
+    },
+    order: [["createdAt", "ASC"]],
+  });
+}
+
 export async function hasWorkflowStageAttempts(input: {
   pipelineId: string;
   userId: string;

@@ -1,5 +1,7 @@
 import z from "zod";
 import { CLAUDE_MODELS, VIDEO_MODELS } from "../constants/constant";
+import { StoryInputSchema } from "../schema/story.schema";
+import { ListInputSchema } from "../schema/list.schema";
 
 const claudeModelValues = Object.values(CLAUDE_MODELS) as [string, ...string[]];
 const videoModelValues = Object.values(VIDEO_MODELS) as [string, ...string[]];
@@ -21,11 +23,29 @@ export const getReelsSchema = z.object({
   }),
 });
 
-export const generateScriptSchema = z.object({
-  body: z.object({
-    topic: z.string().min(3, "Topic must be at least 3 characters"),
-    model: z.enum(claudeModelValues).default(CLAUDE_MODELS["Sonnet 4.5"]),
-    videoModel: z.enum(videoModelValues).default(VIDEO_MODELS["Seedance 1.5 Pro"]),
-    ttsVoice: z.enum(TTS_VOICES).default("aoede"),
-  }),
-});
+const commonGenerationFields = {
+  topic: z.string().trim().min(3, "Topic must be at least 3 characters"),
+  model: z.enum(claudeModelValues).default(CLAUDE_MODELS["Sonnet 4.5"]),
+  videoModel: z.enum(videoModelValues).default(VIDEO_MODELS["Seedance 1.5 Pro"]),
+  ttsVoice: z.enum(TTS_VOICES).default("aoede"),
+  autoPublish: z.boolean().default(false),
+};
+
+export const generateScriptBodySchema = z.union([
+  z.object({
+    ...commonGenerationFields,
+    videoType: z.literal("explainer").default("explainer"),
+  }).strict(),
+  z.object({
+    ...commonGenerationFields,
+    videoType: z.literal("story"),
+    storyInput: StoryInputSchema,
+  }).strict(),
+  z.object({
+    ...commonGenerationFields,
+    videoType: z.literal("list"),
+    listInput: ListInputSchema,
+  }).strict(),
+]);
+
+export const generateScriptSchema = z.object({ body: generateScriptBodySchema });
