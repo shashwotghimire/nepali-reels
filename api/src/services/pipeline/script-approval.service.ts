@@ -91,7 +91,10 @@ export async function reviseScriptService(
         throw error;
       }
       try { revised = validateScript(reservation.videoType, providerResult, current, access); }
-      catch (error) { await rejectAiRevisionProviderResult(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner, error instanceof Error ? error.message : String(error)); throw error; }
+      catch (error) {
+        await rejectAiRevisionProviderResult(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner, error instanceof Error ? error.message : String(error));
+        throw new ApiError(409, "Revision provider result was invalid; this attempt was consumed", "Revision was abandoned");
+      }
       await saveAiRevisionProviderResult(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner, revised);
     }
     const result = await completeAiScriptRevision({ pipelineId, userId, idempotencyKey: input.idempotencyKey, expectedVersion: reservation.scriptVersion, script: revised, leaseOwner: reservation.leaseOwner });

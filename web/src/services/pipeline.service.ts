@@ -8,6 +8,7 @@ import type {
   GenerationEntitlements,
   ChannelStyle,
 } from "@/types/api/pipeline-api.types";
+import { acknowledgeKeyedOperation, runKeyedOperation, type OperationKind } from "@/services/operation-key";
 
 export const getReelsService = async (params?: GetReelsParams) => {
   const res = (
@@ -63,18 +64,11 @@ export const editScriptService = async (id: string, expectedVersion: number, scr
   return res.data;
 };
 
-function operationKey(kind: string, id: string, supplied?: string) {
-  const storageKey = `phase4:${kind}:${id}`;
-  const key = supplied ?? localStorage.getItem(storageKey) ?? crypto.randomUUID();
-  localStorage.setItem(storageKey, key);
-  return { key, storageKey };
-}
-
 export const reviseScriptService = async (id: string, expectedVersion: number, instruction: string, suppliedKey?: string) => {
-  const { key, storageKey } = operationKey("script-revision", id, suppliedKey);
-  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/script/revise`, { expectedVersion, instruction }, { headers: { "Idempotency-Key": key } })).data;
-  if (localStorage.getItem(storageKey) === key) localStorage.removeItem(storageKey);
-  return res.data;
+  return runKeyedOperation({ kind: "script-revision", id, payload: JSON.stringify([expectedVersion, instruction]), suppliedKey, execute: async (key) => {
+    const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/script/revise`, { expectedVersion, instruction }, { headers: { "Idempotency-Key": key } })).data;
+    return res.data;
+  } });
 };
 
 export const approveScriptService = async (id: string, expectedVersion: number) => {
@@ -83,10 +77,10 @@ export const approveScriptService = async (id: string, expectedVersion: number) 
 };
 
 export const regenerateThumbnailService = async (id: string, suppliedKey?: string) => {
-  const { key, storageKey } = operationKey("thumbnail-regeneration", id, suppliedKey);
-  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/thumbnails/regenerate`, undefined, { headers: { "Idempotency-Key": key } })).data;
-  if (localStorage.getItem(storageKey) === key) localStorage.removeItem(storageKey);
-  return res.data;
+  return runKeyedOperation({ kind: "thumbnail-regeneration", id, payload: "regenerate", suppliedKey, execute: async (key) => {
+    const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/thumbnails/regenerate`, undefined, { headers: { "Idempotency-Key": key } })).data;
+    return res.data;
+  } });
 };
 export const selectThumbnailService = async (id: string, version: number) => {
   const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/thumbnails/${version}/select`)).data;
@@ -95,4 +89,9 @@ export const selectThumbnailService = async (id: string, version: number) => {
 export const getChannelStylesService = async () => ((await axiosInstance.get<{ data: ChannelStyle[] }>("/api/pipeline/styles")).data.data);
 export const createChannelStyleService = async (form: FormData) => ((await axiosInstance.post<{ data: ChannelStyle }>("/api/pipeline/styles", form)).data.data);
 export const deleteChannelStyleService = async (id: string) => { await axiosInstance.delete(`/api/pipeline/styles/${id}`); };
-export const abandonUncertainOperationService = async (id: string, kind: string, key: string) => { await axiosInstance.post(`/api/pipeline/${id}/operations/${kind}/${encodeURIComponent(key)}/abandon`); };
+export const abandonUncertainOperationService = async (id: string, kind: "script_revision" | "thumbnail_regeneration", key: string) => acknowledgeKeyedOperation({
+  kind: (kind === "script_revision" ? "script-revision" : "thumbnail-regeneration") satisfies OperationKind,
+  id,
+  key,
+  execute: async () => { await axiosInstance.post(`/api/pipeline/${id}/operations/${kind}/${encodeURIComponent(key)}/abandon`); },
+});

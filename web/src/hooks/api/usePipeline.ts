@@ -76,7 +76,7 @@ export const useSelectThumbnail = (id: string) => useScriptMutation(id, (version
 export const useChannelStyles = () => useQuery({ queryKey: ["pipeline", "styles"], queryFn: getChannelStylesService });
 export const useCreateChannelStyle = () => { const qc = useQueryClient(); return useMutation({ mutationFn: createChannelStyleService, onSuccess: () => qc.invalidateQueries({ queryKey: ["pipeline", "styles"] }) }); };
 export const useDeleteChannelStyle = () => { const qc = useQueryClient(); return useMutation({ mutationFn: deleteChannelStyleService, onSuccess: () => qc.invalidateQueries({ queryKey: ["pipeline", "styles"] }) }); };
-export const useAbandonUncertainOperation = (id: string) => useScriptMutation(id, (input: { kind: string; key: string }) => abandonUncertainOperationService(id, input.kind, input.key));
+export const useAbandonUncertainOperation = (id: string) => useScriptMutation(id, (input: { kind: "script_revision" | "thumbnail_regeneration"; key: string }) => abandonUncertainOperationService(id, input.kind, input.key));
 
 export const useGenerateScript = () => {
   const queryClient = useQueryClient();
