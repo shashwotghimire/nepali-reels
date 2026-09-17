@@ -206,7 +206,8 @@ export async function approveCurrentScript(
     const fingerprint = fingerprintScript(pipeline.finalScript);
     if (!pipeline.scriptApprovedAt) {
       assertReviewableLifecycle(pipeline);
-      if (await ScriptRevisionRequest.count({ where: { pipelineId, status: { [Op.in]: ["reserved", "submitted", "provider_succeeded", "uncertain"] } }, transaction })) throw new Error("An AI revision is still active");
+      await ScriptRevisionRequest.update({ status: "abandoned", error: "Superseded by a newer script version" }, { where: { pipelineId, scriptVersion: { [Op.ne]: expectedVersion }, status: { [Op.in]: ["reserved", "submitted", "provider_succeeded", "uncertain"] } }, transaction });
+      if (await ScriptRevisionRequest.count({ where: { pipelineId, scriptVersion: expectedVersion, status: { [Op.in]: ["reserved", "submitted", "provider_succeeded", "uncertain"] } }, transaction })) throw new Error("An AI revision is still active");
       pipeline.scriptApprovedAt = new Date();
       pipeline.approvedScriptFingerprint = fingerprint;
       pipeline.pipelineStatus = "script_finalised";
@@ -226,28 +227,36 @@ export type RevisionReservation =
   | { state: "uncertain" }
   | { state: "consumed" };
 
-export async function reserveAiScriptRevision(input: { pipelineId: string; userId: string; idempotencyKey: string; expectedVersion: number; limit: number }): Promise<RevisionReservation> {
+export async function reserveAiScriptRevision(input: { pipelineId: string; userId: string; idempotencyKey: string; expectedVersion: number; instruction: string; limit: number }): Promise<RevisionReservation> {
   return sequelize.transaction(async (transaction) => {
     const pipeline = await findOwnedPipelineForUpdate(input.pipelineId, input.userId, transaction);
     const existing = await ScriptRevisionRequest.findOne({ where: { pipelineId: input.pipelineId, idempotencyKey: input.idempotencyKey }, transaction, lock: transaction.LOCK.UPDATE });
+    if (existing && (existing.scriptVersion !== input.expectedVersion || existing.instruction !== input.instruction)) throw new Error("Idempotency key payload conflict");
     if (existing?.status === "applied" && existing.result) return { state: "completed", result: existing.result };
+    if (existing?.status === "provider_succeeded" && (pipeline.s3key || pipeline.pipelineStatus !== "awaiting_script_approval" || pipeline.scriptApprovedAt || pipeline.scriptVersion !== existing.scriptVersion)) {
+      existing.status = "abandoned"; existing.error = "Saved result was superseded by the reel lifecycle"; await existing.save({ transaction });
+      return { state: "consumed" };
+    }
     assertReviewableLifecycle(pipeline);
     if (existing?.status === "provider_succeeded" && existing.result) return { state: "provider_succeeded", result: existing.result, scriptVersion: existing.scriptVersion, leaseOwner: existing.leaseOwner };
+    if (existing?.status === "submitted" && existing.leaseExpiresAt > new Date()) return { state: "running" };
     if (existing?.status === "submitted") { existing.status = "uncertain"; await existing.save({ transaction }); return { state: "uncertain" }; }
     if (existing?.status === "uncertain") return { state: "uncertain" };
     if (existing?.status === "abandoned") return { state: "consumed" };
     if (existing?.status === "reserved" && existing.leaseExpiresAt > new Date()) return { state: "running" };
     if (!pipeline.finalScript) throw new Error("Reviewable script not found");
     if (pipeline.scriptVersion !== input.expectedVersion) throw new Error("Script version conflict");
+    const competing = await ScriptRevisionRequest.findOne({ where: { pipelineId: input.pipelineId, scriptVersion: input.expectedVersion, status: { [Op.in]: ["reserved", "submitted", "provider_succeeded", "uncertain"] }, ...(existing ? { id: { [Op.ne]: existing.id } } : {}) }, transaction, lock: transaction.LOCK.UPDATE });
+    if (competing) throw new Error("An AI revision is already active for this script version");
     const consumesNewSlot = !existing || existing.status === "failed";
     if (consumesNewSlot && pipeline.scriptRevisionCount >= input.limit) throw new Error("AI script revision limit reached");
     if (consumesNewSlot) pipeline.scriptRevisionCount += 1;
     await pipeline.save({ transaction });
     if (existing) {
-      existing.status = "reserved"; existing.scriptVersion = input.expectedVersion; existing.result = null; existing.leaseOwner = randomUUID(); existing.leaseExpiresAt = new Date(Date.now() + 5 * 60_000); existing.error = null;
+      existing.status = "reserved"; existing.scriptVersion = input.expectedVersion; existing.instruction = input.instruction; existing.result = null; existing.leaseOwner = randomUUID(); existing.leaseExpiresAt = new Date(Date.now() + 5 * 60_000); existing.error = null;
       await existing.save({ transaction });
     } else {
-      await ScriptRevisionRequest.create({ pipelineId: input.pipelineId, userId: input.userId, idempotencyKey: input.idempotencyKey, scriptVersion: input.expectedVersion, status: "reserved", result: null, leaseOwner: randomUUID(), leaseExpiresAt: new Date(Date.now() + 5 * 60_000), error: null }, { transaction });
+      await ScriptRevisionRequest.create({ pipelineId: input.pipelineId, userId: input.userId, idempotencyKey: input.idempotencyKey, scriptVersion: input.expectedVersion, instruction: input.instruction, status: "reserved", result: null, leaseOwner: randomUUID(), leaseExpiresAt: new Date(Date.now() + 5 * 60_000), error: null }, { transaction });
     }
     const request = existing ?? await ScriptRevisionRequest.findOne({ where: { pipelineId: input.pipelineId, idempotencyKey: input.idempotencyKey }, transaction });
     return { state: "reserved", script: pipeline.finalScript, videoType: pipeline.videoType, model: pipeline.claudeModel, scriptVersion: pipeline.scriptVersion, leaseOwner: request!.leaseOwner };
@@ -266,7 +275,7 @@ export async function markAiRevisionUncertain(pipelineId: string, userId: string
   await ScriptRevisionRequest.update({ status: "uncertain", error }, { where: { pipelineId, userId, idempotencyKey, leaseOwner, status: "submitted" } });
 }
 export async function rejectAiRevisionProviderResult(pipelineId: string, userId: string, idempotencyKey: string, leaseOwner: string, error: string) {
-  await ScriptRevisionRequest.update({ status: "failed", error }, { where: { pipelineId, userId, idempotencyKey, leaseOwner, status: "submitted" } });
+  await ScriptRevisionRequest.update({ status: "abandoned", error: `Provider result was invalid: ${error}` }, { where: { pipelineId, userId, idempotencyKey, leaseOwner, status: "submitted" } });
 }
 
 export async function completeAiScriptRevision(input: { pipelineId: string; userId: string; idempotencyKey: string; expectedVersion: number; script: object; leaseOwner: string }) {
@@ -289,11 +298,11 @@ export async function completeAiScriptRevision(input: { pipelineId: string; user
   });
 }
 
-export async function failAiScriptRevision(pipelineId: string, userId: string, idempotencyKey: string) {
+export async function failAiScriptRevision(pipelineId: string, userId: string, idempotencyKey: string, leaseOwner: string) {
   await sequelize.transaction(async (transaction) => {
     const pipeline = await findOwnedPipelineForUpdate(pipelineId, userId, transaction);
     const request = await ScriptRevisionRequest.findOne({ where: { pipelineId, userId, idempotencyKey }, transaction, lock: transaction.LOCK.UPDATE });
-    if (request?.status === "reserved") { request.status = "failed"; pipeline.scriptRevisionCount = Math.max(0, pipeline.scriptRevisionCount - 1); await request.save({ transaction }); await pipeline.save({ transaction }); }
+    if (request?.status === "reserved" && request.leaseOwner === leaseOwner) { request.status = "failed"; pipeline.scriptRevisionCount = Math.max(0, pipeline.scriptRevisionCount - 1); await request.save({ transaction }); await pipeline.save({ transaction }); }
   });
 }
 
@@ -309,8 +318,8 @@ export async function abandonUncertainThumbnailRegeneration(pipelineId: string, 
 
 export async function findPhase4OperationIssues(pipelineId: string, userId: string) {
   const [revisions, thumbnails] = await Promise.all([
-    ScriptRevisionRequest.findAll({ where: { pipelineId, userId, [Op.or]: [{ status: "uncertain" }, { status: "submitted", leaseExpiresAt: { [Op.lt]: new Date() } }] }, attributes: ["idempotencyKey", "status", "error", "updatedAt"] }),
-    ThumbnailGenerationRequest.findAll({ where: { pipelineId, userId, [Op.or]: [{ status: "uncertain" }, { status: "submitted", leaseExpiresAt: { [Op.lt]: new Date() } }] }, attributes: ["idempotencyKey", "status", "error", "version", "updatedAt"] }),
+    ScriptRevisionRequest.findAll({ where: { pipelineId, userId, [Op.or]: [{ status: { [Op.in]: ["uncertain", "provider_succeeded"] } }, { status: { [Op.in]: ["reserved", "submitted"] }, leaseExpiresAt: { [Op.lt]: new Date() } }] }, attributes: ["idempotencyKey", "status", "error", "scriptVersion", "instruction", "updatedAt"] }),
+    ThumbnailGenerationRequest.findAll({ where: { pipelineId, userId, [Op.or]: [{ status: { [Op.in]: ["uncertain", "provider_succeeded"] } }, { status: { [Op.in]: ["reserved", "submitted"] }, leaseExpiresAt: { [Op.lt]: new Date() } }] }, attributes: ["idempotencyKey", "status", "error", "version", "updatedAt"] }),
   ]);
   return [
     ...revisions.map((request) => ({ kind: "script_revision" as const, ...request.toJSON() })),
@@ -383,6 +392,7 @@ export async function reserveThumbnailRegeneration(input: { pipelineId: string; 
     const existing = await ThumbnailGenerationRequest.findOne({ where: { pipelineId: input.pipelineId, idempotencyKey: input.idempotencyKey }, transaction, lock: transaction.LOCK.UPDATE });
     if (existing?.status === "completed") return { state: "completed" as const, version: existing.version, pipeline };
     if (existing?.status === "provider_succeeded" && existing.url) return { state: "provider_succeeded" as const, version: existing.version, url: existing.url, leaseOwner: existing.leaseOwner, pipeline };
+    if (existing?.status === "submitted" && existing.leaseExpiresAt > new Date()) return { state: "running" as const, version: existing.version, pipeline };
     if (existing?.status === "submitted") { existing.status = "uncertain"; await existing.save({ transaction }); return { state: "uncertain" as const, version: existing.version, pipeline }; }
     if (existing?.status === "uncertain") return { state: "uncertain" as const, version: existing.version, pipeline };
     if (existing?.status === "abandoned") return { state: "consumed" as const, version: existing.version, pipeline };

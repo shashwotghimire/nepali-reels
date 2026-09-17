@@ -63,8 +63,17 @@ export const editScriptService = async (id: string, expectedVersion: number, scr
   return res.data;
 };
 
-export const reviseScriptService = async (id: string, expectedVersion: number, instruction: string) => {
-  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/script/revise`, { expectedVersion, instruction }, { headers: { "Idempotency-Key": crypto.randomUUID() } })).data;
+function operationKey(kind: string, id: string, supplied?: string) {
+  const storageKey = `phase4:${kind}:${id}`;
+  const key = supplied ?? localStorage.getItem(storageKey) ?? crypto.randomUUID();
+  localStorage.setItem(storageKey, key);
+  return { key, storageKey };
+}
+
+export const reviseScriptService = async (id: string, expectedVersion: number, instruction: string, suppliedKey?: string) => {
+  const { key, storageKey } = operationKey("script-revision", id, suppliedKey);
+  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/script/revise`, { expectedVersion, instruction }, { headers: { "Idempotency-Key": key } })).data;
+  if (localStorage.getItem(storageKey) === key) localStorage.removeItem(storageKey);
   return res.data;
 };
 
@@ -73,8 +82,10 @@ export const approveScriptService = async (id: string, expectedVersion: number) 
   return res.data;
 };
 
-export const regenerateThumbnailService = async (id: string) => {
-  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/thumbnails/regenerate`, undefined, { headers: { "Idempotency-Key": crypto.randomUUID() } })).data;
+export const regenerateThumbnailService = async (id: string, suppliedKey?: string) => {
+  const { key, storageKey } = operationKey("thumbnail-regeneration", id, suppliedKey);
+  const res = (await axiosInstance.post<{ data: Reel }>(`/api/pipeline/${id}/thumbnails/regenerate`, undefined, { headers: { "Idempotency-Key": key } })).data;
+  if (localStorage.getItem(storageKey) === key) localStorage.removeItem(storageKey);
   return res.data;
 };
 export const selectThumbnailService = async (id: string, version: number) => {

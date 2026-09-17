@@ -26,6 +26,8 @@ test("Phase 4 migration runs and reruns against disposable PostgreSQL pre-Phase4
     const columns = await q.describeTable("reels");
     assert.ok(columns.autoPublishRequested);
     assert.ok(columns.nextThumbnailVersion);
+    const revisionColumns = await q.describeTable("script_revision_requests");
+    assert.ok(revisionColumns.instruction);
     const [fk] = await sequelize.query(`SELECT ccu.table_name AS target FROM information_schema.table_constraints tc JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name=tc.constraint_name WHERE tc.table_name='channel_styles' AND tc.constraint_type='FOREIGN KEY'`);
     assert.deepEqual(fk.map((row) => row.target), ["user"]);
     const [tables] = await sequelize.query(`SELECT tablename FROM pg_tables WHERE schemaname='public'`);

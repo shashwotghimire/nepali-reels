@@ -48,6 +48,7 @@ module.exports = {
         pipelineId: { type: Sequelize.UUID, allowNull: false, references: { model: "reels", key: "id" }, onDelete: "CASCADE" },
         userId: { type: Sequelize.STRING, allowNull: false }, idempotencyKey: { type: Sequelize.STRING, allowNull: false },
         scriptVersion: { type: Sequelize.INTEGER, allowNull: false }, status: { type: Sequelize.STRING, allowNull: false },
+        instruction: { type: Sequelize.TEXT, allowNull: true },
         result: { type: Sequelize.JSONB, allowNull: true }, leaseOwner: { type: Sequelize.STRING, allowNull: false },
         leaseExpiresAt: { type: Sequelize.DATE, allowNull: false }, error: { type: Sequelize.TEXT, allowNull: true },
         createdAt: { type: Sequelize.DATE, allowNull: false }, updatedAt: { type: Sequelize.DATE, allowNull: false },
@@ -55,6 +56,7 @@ module.exports = {
       await addColumnIfMissing(queryInterface, "script_revision_requests", "leaseOwner", { type: Sequelize.STRING, allowNull: false, defaultValue: "migration-recovery" }, transaction);
       await addColumnIfMissing(queryInterface, "script_revision_requests", "leaseExpiresAt", { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal("CURRENT_TIMESTAMP") }, transaction);
       await addColumnIfMissing(queryInterface, "script_revision_requests", "error", { type: Sequelize.TEXT, allowNull: true }, transaction);
+      await addColumnIfMissing(queryInterface, "script_revision_requests", "instruction", { type: Sequelize.TEXT, allowNull: true }, transaction);
       await addIndexIfMissing(queryInterface, "script_revision_requests", ["pipelineId", "idempotencyKey"], { name: "script_revision_pipeline_key_unique", unique: true, transaction });
 
       await createTableIfMissing(queryInterface, "thumbnail_generation_requests", {

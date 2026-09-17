@@ -7,6 +7,7 @@ export default class ScriptRevisionRequest extends Model<InferAttributes<ScriptR
   declare userId: string;
   declare idempotencyKey: string;
   declare scriptVersion: number;
+  declare instruction: CreationOptional<string | null>;
   declare status: "reserved" | "submitted" | "provider_succeeded" | "applied" | "failed" | "uncertain" | "abandoned";
   declare result: CreationOptional<object | null>;
   declare leaseOwner: string;
@@ -22,6 +23,7 @@ ScriptRevisionRequest.init({
   userId: { type: DataTypes.STRING, allowNull: false },
   idempotencyKey: { type: DataTypes.STRING, allowNull: false },
   scriptVersion: { type: DataTypes.INTEGER, allowNull: false },
+  instruction: { type: DataTypes.TEXT, allowNull: true },
   status: { type: DataTypes.STRING, allowNull: false },
   result: { type: DataTypes.JSONB, allowNull: true },
   leaseOwner: { type: DataTypes.STRING, allowNull: false },

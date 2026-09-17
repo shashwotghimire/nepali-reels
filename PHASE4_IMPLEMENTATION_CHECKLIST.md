@@ -33,6 +33,8 @@
 ## Operational recovery
 
 - Expired `reserved` work is safe to reclaim because no provider call was marked submitted.
+- A replay while `submitted` still has a live lease is observational only: it reports running and cannot change ownership or invalidate the original result.
 - `submitted` work without a durable result becomes `uncertain` and is never automatically reissued. The reel API exposes it to the UI for explicit acknowledgement; acknowledgement unblocks the reel but retains the consumed entitlement.
-- Durable `provider_succeeded` results are applied on replay without another provider call; `applied`/`completed` requests are idempotent.
+- The client retains the idempotency key across retry/reload, and the reel API discovers expired reservations and durable `provider_succeeded` results so the UI can resume them safely. Revision keys are bound to the original script version and instruction.
+- Durable `provider_succeeded` results are applied on replay without another provider call; `applied`/`completed` requests are idempotent. Only one AI revision request may be active for a reel/script version.
 - If an earlier Phase 4 migration attempt partially applied, rerun the corrected migration. The enum addition is separately idempotent and all remaining conditional schema work is transactional.

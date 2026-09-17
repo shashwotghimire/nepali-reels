@@ -70,7 +70,7 @@ export async function reviseScriptService(
   generator: ScriptRevisionGenerator = bedrockScriptRevisionGenerator,
 ) {
   const access = await resolveServerGenerationAccess(userId);
-  const reservation = await reserveAiScriptRevision({ pipelineId, userId, idempotencyKey: input.idempotencyKey, expectedVersion: input.expectedVersion, limit: access.entitlement.aiRevisionsPerVideo });
+  const reservation = await reserveAiScriptRevision({ pipelineId, userId, idempotencyKey: input.idempotencyKey, expectedVersion: input.expectedVersion, instruction: input.instruction, limit: access.entitlement.aiRevisionsPerVideo });
   if (reservation.state === "completed") return findPipelineById(pipelineId, userId);
   if (reservation.state === "running") throw new ApiError(409, "Revision is already running", "Conflict");
   if (reservation.state === "uncertain") throw new ApiError(409, "Revision provider outcome is uncertain; no retry was sent", "Revision needs reconciliation");
@@ -98,7 +98,7 @@ export async function reviseScriptService(
     const summary = await getPipelineCostSummary(pipelineId, userId);
     await savePipelineCost(pipelineId, userId, summary.knownCostUsd, true);
     return result;
-  } catch (error) { if (reservation.state === "reserved") await failAiScriptRevision(pipelineId, userId, input.idempotencyKey); throw error; }
+  } catch (error) { if (reservation.state === "reserved") await failAiScriptRevision(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner); throw error; }
 }
 
 export async function approveScriptService(userId: string, pipelineId: string, expectedVersion: number) {

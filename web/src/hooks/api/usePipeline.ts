@@ -67,11 +67,11 @@ function useScriptMutation<T>(id: string, mutationFn: (input: T) => Promise<unkn
 
 export const useEditScript = (id: string) => useScriptMutation(id, (input: { expectedVersion: number; script: object }) =>
   editScriptService(id, input.expectedVersion, input.script));
-export const useReviseScript = (id: string) => useScriptMutation(id, (input: { expectedVersion: number; instruction: string }) =>
-  reviseScriptService(id, input.expectedVersion, input.instruction));
+export const useReviseScript = (id: string) => useScriptMutation(id, (input: { expectedVersion: number; instruction: string; idempotencyKey?: string }) =>
+  reviseScriptService(id, input.expectedVersion, input.instruction, input.idempotencyKey));
 export const useApproveScript = (id: string) => useScriptMutation(id, (expectedVersion: number) =>
   approveScriptService(id, expectedVersion));
-export const useRegenerateThumbnail = (id: string) => useScriptMutation(id, () => regenerateThumbnailService(id));
+export const useRegenerateThumbnail = (id: string) => useScriptMutation(id, (idempotencyKey?: string) => regenerateThumbnailService(id, idempotencyKey));
 export const useSelectThumbnail = (id: string) => useScriptMutation(id, (version: number) => selectThumbnailService(id, version));
 export const useChannelStyles = () => useQuery({ queryKey: ["pipeline", "styles"], queryFn: getChannelStylesService });
 export const useCreateChannelStyle = () => { const qc = useQueryClient(); return useMutation({ mutationFn: createChannelStyleService, onSuccess: () => qc.invalidateQueries({ queryKey: ["pipeline", "styles"] }) }); };

@@ -191,7 +191,7 @@ interface ReelBase {
   thumbnailUrl: string | null;
   thumbnailVersions: { version: number; url: string; artifactKey: string }[] | null;
   selectedThumbnailVersion: number | null;
-  operationIssues?: { kind: "script_revision" | "thumbnail_regeneration"; idempotencyKey: string; status: "submitted" | "uncertain"; error: string | null; version?: number }[];
+  operationIssues?: { kind: "script_revision" | "thumbnail_regeneration"; idempotencyKey: string; status: "reserved" | "submitted" | "provider_succeeded" | "uncertain"; error: string | null; version?: number; scriptVersion?: number; instruction?: string | null }[];
 }
 
 export interface ExplainerReel extends ReelBase {
