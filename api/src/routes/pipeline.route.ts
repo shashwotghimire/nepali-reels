@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { approveScript, editScript, generateScript, getEntitlements, getReels, getPipelineById, getPipelineAudio, getPipelineVideo, deletePipeline, regenerateThumbnail, retryPipeline, reviseScript, selectThumbnail } from "../controllers/pipeline.controller";
+import { abandonUncertainOperation, approveScript, editScript, generateScript, getEntitlements, getReels, getPipelineById, getPipelineAudio, getPipelineVideo, deletePipeline, regenerateThumbnail, retryPipeline, reviseScript, selectThumbnail } from "../controllers/pipeline.controller";
 import { validate } from "../middlewares/validation.middleware";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { approveScriptSchema, editScriptSchema, generateScriptSchema, getReelsSchema, getPipelineByIdSchema, reviseScriptSchema } from "../validations/pipeline.validation";
@@ -22,6 +22,7 @@ router.post("/:id/script/revise", authMiddleware, validate(reviseScriptSchema), 
 router.post("/:id/script/approve", authMiddleware, validate(approveScriptSchema), approveScript);
 router.post("/:id/thumbnails/regenerate", authMiddleware, regenerateThumbnail);
 router.post("/:id/thumbnails/:version/select", authMiddleware, selectThumbnail);
+router.post("/:id/operations/:kind/:key/abandon", authMiddleware, abandonUncertainOperation);
 router.post("/generate-script", authMiddleware, validate(generateScriptSchema), generateScript);
 
 export default router;

@@ -7,8 +7,11 @@ export default class ScriptRevisionRequest extends Model<InferAttributes<ScriptR
   declare userId: string;
   declare idempotencyKey: string;
   declare scriptVersion: number;
-  declare status: "running" | "succeeded" | "failed";
+  declare status: "reserved" | "submitted" | "provider_succeeded" | "applied" | "failed" | "uncertain" | "abandoned";
   declare result: CreationOptional<object | null>;
+  declare leaseOwner: string;
+  declare leaseExpiresAt: Date;
+  declare error: CreationOptional<string | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -21,6 +24,9 @@ ScriptRevisionRequest.init({
   scriptVersion: { type: DataTypes.INTEGER, allowNull: false },
   status: { type: DataTypes.STRING, allowNull: false },
   result: { type: DataTypes.JSONB, allowNull: true },
+  leaseOwner: { type: DataTypes.STRING, allowNull: false },
+  leaseExpiresAt: { type: DataTypes.DATE, allowNull: false },
+  error: { type: DataTypes.TEXT, allowNull: true },
   createdAt: DataTypes.DATE,
   updatedAt: DataTypes.DATE,
 }, { sequelize, tableName: "script_revision_requests", modelName: "ScriptRevisionRequest" });

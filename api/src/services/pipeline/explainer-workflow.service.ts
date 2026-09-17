@@ -164,6 +164,7 @@ export async function runExplainerWorkflow(input: {
               input.userId,
               reviewedScript,
               lease,
+              pipeline.scriptVersion,
             );
             return { persisted: "finalScript" };
           }

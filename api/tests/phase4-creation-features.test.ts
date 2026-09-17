@@ -7,6 +7,7 @@ import { PLAN_ENTITLEMENTS } from "../src/commercial/policy";
 import { EnvironmentTestAccessResolver, resolveServerGenerationAccess } from "../src/services/pipeline/entitlement-resolution.service";
 import { WorkflowAwaitingApprovalError, shouldMarkPipelineFailed } from "../src/services/pipeline/workflow-dispatcher.service";
 import { renderBrandFrame, renderCaptionFrames } from "../src/helpers/subtitle-renderer";
+import { dispatchPipelineService } from "../src/services/pipeline/pipeline.service";
 
 test("approval pauses are not pipeline failures", () => {
   assert.equal(shouldMarkPipelineFailed(new WorkflowAwaitingApprovalError()), false);
@@ -48,4 +49,16 @@ test("caption presets and channel branding create distinct real composition fram
 test("Phase 4 migration persists approval, style, revision-idempotency and thumbnail version state", async () => {
   const migration = await fs.promises.readFile(new URL("../migrations/20260916000002-phase4-creation-features.js", import.meta.url), "utf8");
   for (const term of ["scriptApprovedAt", "scriptRevisionCount", "channel_styles", "script_revision_requests", "thumbnailVersions", "selectedThumbnailVersion"]) assert.match(migration, new RegExp(term));
+});
+
+test("persisted auto-publish intent survives approval resume while false remains false", async () => {
+  const observed: boolean[] = [];
+  const dependencies = {
+    findPipeline: async (_id: string, userId: string) => ({ videoType: "explainer", autoPublishRequested: userId === "opted-in" }),
+    runExplainer: async (input: { autoPublish: boolean }) => { observed.push(input.autoPublish); },
+    runStory: async () => {}, runList: async () => {},
+  };
+  await dispatchPipelineService("opted-in", "reel-a", "approval-job", false, "lease-a", dependencies as never);
+  await dispatchPipelineService("control", "reel-b", "approval-job", false, "lease-b", dependencies as never);
+  assert.deepEqual(observed, [true, false]);
 });

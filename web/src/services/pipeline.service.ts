@@ -84,3 +84,4 @@ export const selectThumbnailService = async (id: string, version: number) => {
 export const getChannelStylesService = async () => ((await axiosInstance.get<{ data: ChannelStyle[] }>("/api/pipeline/styles")).data.data);
 export const createChannelStyleService = async (form: FormData) => ((await axiosInstance.post<{ data: ChannelStyle }>("/api/pipeline/styles", form)).data.data);
 export const deleteChannelStyleService = async (id: string) => { await axiosInstance.delete(`/api/pipeline/styles/${id}`); };
+export const abandonUncertainOperationService = async (id: string, kind: string, key: string) => { await axiosInstance.post(`/api/pipeline/${id}/operations/${kind}/${encodeURIComponent(key)}/abandon`); };

@@ -2,6 +2,7 @@ import {
   findAllReelsOfUser,
   findPipelineById,
   deletePipelineById,
+  findPhase4OperationIssues,
 } from "../repositories/reels.repository";
 import { ApiError } from "../utils/ApiError.util";
 import fs from "node:fs";
@@ -50,6 +51,7 @@ export const getPipelineByIdService = async (
   return {
     ...plain,
     workflowProgress: await attachWorkflowProgress(plain),
+    operationIssues: await findPhase4OperationIssues(pipelineId, userId),
   };
 };
 

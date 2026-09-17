@@ -2,7 +2,7 @@ import client from "../../configs/llm.config";
 import { ScriptOutputSchema } from "../../schema/script-writer.schema";
 import { StoryScriptOutputSchema } from "../../schema/story.schema";
 import { ListScriptOutputSchema } from "../../schema/list.schema";
-import { approveCurrentScript, completeAiScriptRevision, failAiScriptRevision, findPipelineById, replaceReviewableScript, reserveAiScriptRevision } from "../../repositories/reels.repository";
+import { approveCurrentScript, completeAiScriptRevision, failAiScriptRevision, findPipelineById, markAiRevisionSubmitted, markAiRevisionUncertain, rejectAiRevisionProviderResult, replaceReviewableScript, reserveAiScriptRevision, saveAiRevisionProviderResult } from "../../repositories/reels.repository";
 import { resolveServerGenerationAccess, type ResolvedGenerationEntitlement } from "./entitlement-resolution.service";
 import { ApiError } from "../../utils/ApiError.util";
 import { createProviderBudgetContext } from "./provider-budget.service";
@@ -13,6 +13,7 @@ import { getPipelineCostSummary } from "../../repositories/provider-usage.reposi
 import { savePipelineCost } from "../../repositories/reels.repository";
 import { validateListScript, validateStoryScript } from "../../helpers/phase3-content-validation.helper";
 import { createExplainerDurationPolicy } from "./explainer-duration-policy.service";
+import { abandonUncertainScriptRevision } from "../../repositories/reels.repository";
 
 const schemas = { explainer: ScriptOutputSchema, story: StoryScriptOutputSchema, list: ListScriptOutputSchema } as const;
 
@@ -72,22 +73,32 @@ export async function reviseScriptService(
   const reservation = await reserveAiScriptRevision({ pipelineId, userId, idempotencyKey: input.idempotencyKey, expectedVersion: input.expectedVersion, limit: access.entitlement.aiRevisionsPerVideo });
   if (reservation.state === "completed") return findPipelineById(pipelineId, userId);
   if (reservation.state === "running") throw new ApiError(409, "Revision is already running", "Conflict");
+  if (reservation.state === "uncertain") throw new ApiError(409, "Revision provider outcome is uncertain; no retry was sent", "Revision needs reconciliation");
+  if (reservation.state === "consumed") throw new ApiError(409, "This uncertain revision was acknowledged and its entitlement remains consumed", "Revision was abandoned");
   const metering: MeteringContext = { userId, pipelineId, stage: "script_revision", budget: createProviderBudgetContext(pipelineId, access) };
   try {
-  const current = await findPipelineById(pipelineId, userId);
-  if (!current) throw new ApiError(404, "Pipeline not found", "Not found");
-  const revised = validateScript(reservation.videoType, await generator.revise({
-    script: reservation.script,
-    instruction: input.instruction,
-    videoType: reservation.videoType,
-    model: reservation.model,
-    metering,
-  }), current, access);
-  const result = await completeAiScriptRevision({ pipelineId, userId, idempotencyKey: input.idempotencyKey, expectedVersion: reservation.scriptVersion, script: revised });
-  const summary = await getPipelineCostSummary(pipelineId, userId);
-  await savePipelineCost(pipelineId, userId, summary.knownCostUsd, true);
-  return result;
-  } catch (error) { await failAiScriptRevision(pipelineId, userId, input.idempotencyKey); throw error; }
+    const current = await findPipelineById(pipelineId, userId);
+    if (!current) throw new ApiError(404, "Pipeline not found", "Not found");
+    let revised: object;
+    if (reservation.state === "provider_succeeded") revised = validateScript(current.videoType, reservation.result, current, access);
+    else {
+      await markAiRevisionSubmitted(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner);
+      let providerResult: object;
+      try {
+        providerResult = await generator.revise({ script: reservation.script, instruction: input.instruction, videoType: reservation.videoType, model: reservation.model, metering });
+      } catch (error) {
+        await markAiRevisionUncertain(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner, error instanceof Error ? error.message : String(error));
+        throw error;
+      }
+      try { revised = validateScript(reservation.videoType, providerResult, current, access); }
+      catch (error) { await rejectAiRevisionProviderResult(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner, error instanceof Error ? error.message : String(error)); throw error; }
+      await saveAiRevisionProviderResult(pipelineId, userId, input.idempotencyKey, reservation.leaseOwner, revised);
+    }
+    const result = await completeAiScriptRevision({ pipelineId, userId, idempotencyKey: input.idempotencyKey, expectedVersion: reservation.scriptVersion, script: revised, leaseOwner: reservation.leaseOwner });
+    const summary = await getPipelineCostSummary(pipelineId, userId);
+    await savePipelineCost(pipelineId, userId, summary.knownCostUsd, true);
+    return result;
+  } catch (error) { if (reservation.state === "reserved") await failAiScriptRevision(pipelineId, userId, input.idempotencyKey); throw error; }
 }
 
 export async function approveScriptService(userId: string, pipelineId: string, expectedVersion: number) {
@@ -99,3 +110,6 @@ export async function getEntitlementsService(userId: string) {
   const access = await resolveServerGenerationAccess(userId);
   return { accessKind: access.accessKind, plan: access.entitlement };
 }
+
+export const abandonUncertainScriptRevisionService = (userId: string, pipelineId: string, idempotencyKey: string) =>
+  abandonUncertainScriptRevision(pipelineId, userId, idempotencyKey);

@@ -46,6 +46,8 @@ export class Reels extends Model<
   declare channelStyle: CreationOptional<ChannelStyleSnapshot | null>;
   declare thumbnailVersions: CreationOptional<Array<{ version: number; url: string; artifactKey: string }> | null>;
   declare selectedThumbnailVersion: CreationOptional<number | null>;
+  declare nextThumbnailVersion: CreationOptional<number>;
+  declare autoPublishRequested: CreationOptional<boolean>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -177,6 +179,8 @@ Reels.init(
     channelStyle: { type: DataTypes.JSONB, allowNull: true },
     thumbnailVersions: { type: DataTypes.JSONB, allowNull: true },
     selectedThumbnailVersion: { type: DataTypes.INTEGER, allowNull: true },
+    nextThumbnailVersion: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 2 },
+    autoPublishRequested: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   },

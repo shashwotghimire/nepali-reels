@@ -8,7 +8,7 @@ import {
 import {
   findPipelineById,
   saveDraftScript,
-  saveFinalScript,
+  saveLinguisticReview,
   savePipelineCost,
   saveVideoSpec,
 } from "../../repositories/reels.repository";
@@ -134,7 +134,7 @@ async function runStoryWorkflow(input: WorkflowInput) {
             const finalScript = review.verdict === "revise" ? review.revisedScript : draft;
             if (!finalScript) throw new Error("Story reviewer omitted its revision");
             validateStoryScript(storyInput, finalScript, durationPolicy.promptDuration.maximumDurationSeconds);
-            await saveFinalScript(input.pipelineId, input.userId, finalScript, lease);
+            await saveLinguisticReview(input.pipelineId, input.userId, finalScript, lease, pipeline.scriptVersion);
             return { persisted: "finalScript", treatment: storyInput.treatment };
           }
           case "story_video_spec": {
@@ -246,7 +246,7 @@ async function runListWorkflow(input: WorkflowInput) {
             const finalScript = review.verdict === "revise" ? review.revisedScript : draft;
             if (!finalScript) throw new Error("List reviewer omitted its revision");
             validateListScript(listInput, finalScript, durationPolicy.promptDuration.maximumDurationSeconds);
-            await saveFinalScript(input.pipelineId, input.userId, finalScript, lease);
+            await saveLinguisticReview(input.pipelineId, input.userId, finalScript, lease, pipeline.scriptVersion);
             return { persisted: "finalScript", itemCount: listInput.itemCount };
           }
           case "list_video_spec": {

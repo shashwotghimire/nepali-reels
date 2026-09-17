@@ -24,6 +24,7 @@ export const initPipelineService = async (
   contentInput: PipelineContentInput = { videoType: "explainer" },
   captionPreset: CaptionPreset = "default",
   styleId?: string,
+  autoPublishRequested = false,
 ) => {
   const access = await resolveServerGenerationAccess(userId);
   if (!access.entitlement.videoTypes.includes(videoType)) {
@@ -42,6 +43,7 @@ export const initPipelineService = async (
     contentInput,
     style?.captionPreset ?? selectedCaptionPreset,
     style,
+    autoPublishRequested,
   );
 };
 
@@ -95,7 +97,7 @@ export const dispatchPipelineService = async (
     pipelineId,
     executionKey,
     leaseOwner,
-    autoPublish,
+    autoPublish: autoPublish || pipeline.autoPublishRequested,
     access,
   };
   switch (pipeline.videoType) {

@@ -12,8 +12,8 @@ import {
   resolvePipelineAudioPathService,
 } from "../services/reels.service";
 import { getS3PresignedUrl } from "../services/s3.service";
-import { approveScriptService, editScriptService, getEntitlementsService, reviseScriptService } from "../services/pipeline/script-approval.service";
-import { regenerateThumbnailService, selectThumbnailVersionService } from "../services/pipeline/thumbnail-version.service";
+import { abandonUncertainScriptRevisionService, approveScriptService, editScriptService, getEntitlementsService, reviseScriptService } from "../services/pipeline/script-approval.service";
+import { abandonUncertainThumbnailService, regenerateThumbnailService, selectThumbnailVersionService } from "../services/pipeline/thumbnail-version.service";
 
 export const getPipelineById = asyncHandler(
   async (req: Request, res: Response) => {
@@ -173,7 +173,7 @@ export const generateScript = asyncHandler(
         ? { videoType, listInput }
         : { videoType: "explainer" as const };
     const pipeline = await initPipelineService(
-      userId, topic, model, videoModel, ttsVoice, videoType, contentInput, captionPreset, styleId,
+      userId, topic, model, videoModel, ttsVoice, videoType, contentInput, captionPreset, styleId, !!autoPublish,
     );
     await pipelineQueue.add("generate", {
       userId,
@@ -230,4 +230,11 @@ export const regenerateThumbnail = asyncHandler(async (req: Request, res: Respon
 });
 export const selectThumbnail = asyncHandler(async (req: Request, res: Response) => {
   res.json(new ApiResponse(true, "Thumbnail selected", await selectThumbnailVersionService(res.locals.user.id, req.params.id as string, Number(req.params.version))));
+});
+export const abandonUncertainOperation = asyncHandler(async (req: Request, res: Response) => {
+  const pipelineId = req.params.id as string; const key = req.params.key as string;
+  if (req.params.kind === "script_revision") await abandonUncertainScriptRevisionService(res.locals.user.id, pipelineId, key);
+  else if (req.params.kind === "thumbnail_regeneration") await abandonUncertainThumbnailService(res.locals.user.id, pipelineId, key);
+  else throw new Error("Unsupported operation kind");
+  res.json(new ApiResponse(true, "Uncertain operation acknowledged; its entitlement remains consumed", null));
 });

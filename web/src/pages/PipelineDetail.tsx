@@ -16,6 +16,7 @@ import ReelTypeBadge from "@/components/pipeline/ReelTypeBadge";
 import WorkflowProgress from "@/components/pipeline/WorkflowProgress";
 import ScriptApprovalPanel from "@/components/pipeline/ScriptApprovalPanel";
 import ThumbnailVersions from "@/components/pipeline/ThumbnailVersions";
+import OperationIssuePanel from "@/components/pipeline/OperationIssuePanel";
 
 export default function PipelineDetail() {
   const { id } = useParams<{ id: string }>();
@@ -98,6 +99,7 @@ export default function PipelineDetail() {
       {data.pipelineStatus === "awaiting_script_approval" && data.finalScript && (
         <ScriptApprovalPanel key={data.scriptVersion} reel={data} />
       )}
+      <OperationIssuePanel reel={data} />
 
       <div className="grid gap-6 items-start lg:grid-cols-2">
         <div className="space-y-8">
