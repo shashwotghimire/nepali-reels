@@ -8,9 +8,7 @@ module.exports = {
     host: process.env.PGHOST,
     dialect: "postgres",
     dialectOptions: {
-      ssl: {
-        require: true,
-      },
+      ssl: process.env.PGSSL === "disable" ? false : { require: true },
     },
   },
 };

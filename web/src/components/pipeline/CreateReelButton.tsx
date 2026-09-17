@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGenerateScript } from "@/hooks/api/usePipeline";
+import { useChannelStyles, useGenerateScript, useGenerationEntitlements } from "@/hooks/api/usePipeline";
 import type { ClaudeModel, GenerateScriptRequest, ListInput, StoryInput, VideoModel, VideoType, TtsVoice } from "@/types/api/pipeline-api.types";
 import VideoTypeSelector from "./VideoTypeSelector";
 import VideoTypeFields from "./VideoTypeFields";
@@ -78,8 +78,12 @@ export default function CreateReelButton() {
   const [videoModel, setVideoModel] = useState<VideoModel>(DEFAULT_VIDEO_MODEL);
   const [ttsVoice, setTtsVoice] = useState<TtsVoice>(DEFAULT_TTS_VOICE);
   const [autoPublish, setAutoPublish] = useState(false);
+  const [captionPreset, setCaptionPreset] = useState<"default" | "bold" | "minimal">("default");
+  const [styleId, setStyleId] = useState<string>("none");
 
   const { mutate, isPending } = useGenerateScript();
+  const { data: access } = useGenerationEntitlements();
+  const { data: styles = [] } = useChannelStyles();
   const hasValidInput = !!topic.trim() && (
     videoType !== "list" ||
     (Number.isInteger(listInput.itemCount) && listInput.itemCount >= 3 && listInput.itemCount <= 10)
@@ -89,7 +93,8 @@ export default function CreateReelButton() {
     e.preventDefault();
     if (!hasValidInput) return;
     const commonInput = {
-      topic: topic.trim(), model, videoModel, autoPublish, ttsVoice,
+      topic: topic.trim(), model, videoModel, autoPublish, ttsVoice, captionPreset,
+      ...(styleId !== "none" ? { styleId } : {}),
     };
     const request: GenerateScriptRequest = videoType === "story"
       ? { ...commonInput, videoType, storyInput }
@@ -210,7 +215,7 @@ export default function CreateReelButton() {
               <Select
                 value={ttsVoice}
                 onValueChange={(val) => setTtsVoice(val as TtsVoice)}
-                disabled={isPending}
+                disabled={isPending || access?.plan.allSupportedVoices === false}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>
@@ -226,6 +231,9 @@ export default function CreateReelButton() {
                 </SelectContent>
               </Select>
             </div>
+
+            {access?.plan.captionPresets && <div className="space-y-1.5"><label className="text-sm font-medium">Caption preset</label><Select value={captionPreset} onValueChange={(value) => setCaptionPreset(value as typeof captionPreset)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="default">Default</SelectItem><SelectItem value="bold">Bold</SelectItem><SelectItem value="minimal">Minimal</SelectItem></SelectContent></Select></div>}
+            {styles.length > 0 && <div className="space-y-1.5"><label className="text-sm font-medium">Channel style</label><Select value={styleId} onValueChange={(value) => value && setStyleId(value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">No channel overlay</SelectItem>{styles.map((style) => <SelectItem key={style.id} value={style.id}>{style.name}</SelectItem>)}</SelectContent></Select></div>}
 
             <div className="flex items-center gap-2">
               <Checkbox

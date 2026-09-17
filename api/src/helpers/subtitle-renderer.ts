@@ -1,4 +1,4 @@
-import { Canvas, CanvasRenderingContext2D } from "skia-canvas";
+import { Canvas, CanvasRenderingContext2D, loadImage } from "skia-canvas";
 import { writeFile, unlink } from "fs/promises";
 import path from "path";
 import type { Caption, CaptionFrame } from "../types/subtitle.types";
@@ -36,6 +36,7 @@ export type { CaptionFrame };
 export async function renderCaptionFrames(
   scaledCaptions: Caption[],
   outputDir: string,
+  preset: "default" | "bold" | "minimal" = "default",
 ): Promise<CaptionFrame[]> {
   const results: CaptionFrame[] = [];
 
@@ -44,7 +45,7 @@ export async function renderCaptionFrames(
     const canvas = new Canvas(VIDEO_W, VIDEO_H);
     const ctx = canvas.getContext("2d");
 
-    ctx.font = SUBTITLE_FONT;
+    ctx.font = preset === "bold" ? "bold 64px sans-serif" : preset === "minimal" ? "42px sans-serif" : SUBTITLE_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
 
@@ -56,7 +57,7 @@ export async function renderCaptionFrames(
       const x = VIDEO_W / 2;
       const y = startY + l * SUBTITLE_LINE_HEIGHT;
 
-      ctx.lineWidth = SUBTITLE_OUTLINE_WIDTH;
+      ctx.lineWidth = preset === "minimal" ? 2 : preset === "bold" ? 10 : SUBTITLE_OUTLINE_WIDTH;
       ctx.strokeStyle = SUBTITLE_OUTLINE_COLOR;
       ctx.lineJoin = "round";
       ctx.strokeText(lines[l]!, x, y);
@@ -71,6 +72,33 @@ export async function renderCaptionFrames(
   }
 
   return results;
+}
+
+export async function renderBrandFrame(input: { channelName: string; logoUrl: string | null }, outputDir: string, endSec: number): Promise<CaptionFrame> {
+  const canvas = new Canvas(VIDEO_W, VIDEO_H);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "rgba(0,0,0,0.62)";
+  ctx.roundRect(42, VIDEO_H - 175, 520, 96, 30);
+  ctx.fill();
+  let textX = 78;
+  if (input.logoUrl) {
+    const logo = await loadImage(input.logoUrl);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(96, VIDEO_H - 127, 34, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(logo, 62, VIDEO_H - 161, 68, 68);
+    ctx.restore();
+    textX = 150;
+  }
+  ctx.font = "bold 36px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(input.channelName, textX, VIDEO_H - 127, 380);
+  const pngPath = path.join(outputDir, "channel-brand.png");
+  await writeFile(pngPath, await canvas.toBuffer("png"));
+  return { pngPath, startSec: 0, endSec };
 }
 
 /** Render timed emphasis text near the top, independently of narration captions. */

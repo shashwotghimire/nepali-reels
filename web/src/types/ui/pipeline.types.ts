@@ -8,6 +8,7 @@ export const PIPELINE_STATUS_VARIANT: Record<
   script_generated: "secondary",
   script_finalised: "secondary",
   linguistic_reviewed: "secondary",
+  awaiting_script_approval: "outline",
   video_spec_generated: "default",
   sound_generated: "default",
   video_generated: "default",

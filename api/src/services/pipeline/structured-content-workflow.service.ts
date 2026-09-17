@@ -8,7 +8,7 @@ import {
 import {
   findPipelineById,
   saveDraftScript,
-  saveFinalScript,
+  saveLinguisticReview,
   savePipelineCost,
   saveVideoSpec,
 } from "../../repositories/reels.repository";
@@ -21,7 +21,7 @@ import { createExplainerDurationPolicy } from "./explainer-duration-policy.servi
 import type { ResolvedGenerationEntitlement } from "./entitlement-resolution.service";
 import type { MeteringContext } from "./llm-metering";
 import { createWorkflowCheckpointPort } from "./workflow-checkpoint.service";
-import { dispatchWorkflow, type WorkflowStageLease } from "./workflow-dispatcher.service";
+import { dispatchWorkflow, WorkflowAwaitingApprovalError, type WorkflowStageLease } from "./workflow-dispatcher.service";
 import {
   listReviewAgent,
   listScriptGeneratorAgent,
@@ -38,6 +38,7 @@ import {
   validateStoryScript,
   validateStoryVideoSpec,
 } from "../../helpers/phase3-content-validation.helper";
+import { stableFingerprint } from "../../helpers/workflow-artifact.helper";
 import {
   executeSharedProductionStage,
   type ProductionVideoSpec,
@@ -133,10 +134,11 @@ async function runStoryWorkflow(input: WorkflowInput) {
             const finalScript = review.verdict === "revise" ? review.revisedScript : draft;
             if (!finalScript) throw new Error("Story reviewer omitted its revision");
             validateStoryScript(storyInput, finalScript, durationPolicy.promptDuration.maximumDurationSeconds);
-            await saveFinalScript(input.pipelineId, input.userId, finalScript, lease);
+            await saveLinguisticReview(input.pipelineId, input.userId, finalScript, lease, pipeline.scriptVersion);
             return { persisted: "finalScript", treatment: storyInput.treatment };
           }
           case "story_video_spec": {
+            if (!pipeline.scriptApprovedAt || pipeline.approvedScriptFingerprint !== stableFingerprint(pipeline.finalScript)) throw new WorkflowAwaitingApprovalError();
             const finalScript = pipeline.finalScript as StoryScriptOutput | null;
             if (!finalScript) throw new Error("Story review checkpoint has no final script");
             const { data: videoSpec } = await storyVideoSpecGeneratorAgent(
@@ -244,10 +246,11 @@ async function runListWorkflow(input: WorkflowInput) {
             const finalScript = review.verdict === "revise" ? review.revisedScript : draft;
             if (!finalScript) throw new Error("List reviewer omitted its revision");
             validateListScript(listInput, finalScript, durationPolicy.promptDuration.maximumDurationSeconds);
-            await saveFinalScript(input.pipelineId, input.userId, finalScript, lease);
+            await saveLinguisticReview(input.pipelineId, input.userId, finalScript, lease, pipeline.scriptVersion);
             return { persisted: "finalScript", itemCount: listInput.itemCount };
           }
           case "list_video_spec": {
+            if (!pipeline.scriptApprovedAt || pipeline.approvedScriptFingerprint !== stableFingerprint(pipeline.finalScript)) throw new WorkflowAwaitingApprovalError();
             const finalScript = pipeline.finalScript as ListScriptOutput | null;
             if (!finalScript) throw new Error("List review checkpoint has no final script");
             const { data: videoSpec } = await listVideoSpecGeneratorAgent(

@@ -8,7 +8,7 @@ import {
 } from "sequelize";
 import sequelize from "../configs/db.config";
 import User from "./users.model";
-import type { PipelineContentInput, PipelineStatus, VideoType } from "../types/pipeline.types";
+import type { ChannelStyleSnapshot, PipelineContentInput, PipelineStatus, VideoType } from "../types/pipeline.types";
 
 export class Reels extends Model<
   InferAttributes<Reels>,
@@ -38,6 +38,16 @@ export class Reels extends Model<
   declare costEstimateIncomplete: CreationOptional<boolean>;
   declare ttsVoice: CreationOptional<string | null>;
   declare failureReason: CreationOptional<string | null>;
+  declare scriptVersion: CreationOptional<number>;
+  declare scriptRevisionCount: CreationOptional<number>;
+  declare scriptApprovedAt: CreationOptional<Date | null>;
+  declare approvedScriptFingerprint: CreationOptional<string | null>;
+  declare captionPreset: CreationOptional<"default" | "bold" | "minimal">;
+  declare channelStyle: CreationOptional<ChannelStyleSnapshot | null>;
+  declare thumbnailVersions: CreationOptional<Array<{ version: number; url: string; artifactKey: string }> | null>;
+  declare selectedThumbnailVersion: CreationOptional<number | null>;
+  declare nextThumbnailVersion: CreationOptional<number>;
+  declare autoPublishRequested: CreationOptional<boolean>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -105,6 +115,7 @@ Reels.init(
         "script_generated",
         "script_finalised",
         "linguistic_reviewed",
+        "awaiting_script_approval",
         "video_spec_generated",
         "sound_generated",
         "video_generated",
@@ -160,6 +171,16 @@ Reels.init(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    scriptVersion: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    scriptRevisionCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    scriptApprovedAt: { type: DataTypes.DATE, allowNull: true },
+    approvedScriptFingerprint: { type: DataTypes.STRING, allowNull: true },
+    captionPreset: { type: DataTypes.STRING, allowNull: false, defaultValue: "default" },
+    channelStyle: { type: DataTypes.JSONB, allowNull: true },
+    thumbnailVersions: { type: DataTypes.JSONB, allowNull: true },
+    selectedThumbnailVersion: { type: DataTypes.INTEGER, allowNull: true },
+    nextThumbnailVersion: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 2 },
+    autoPublishRequested: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   },
